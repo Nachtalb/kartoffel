@@ -55,3 +55,5 @@ thumbnails/
 # OS
 .DS_Store
 Thumbs.db
+!backend/uploads/.keep
+backend/uploads/
