@@ -1,0 +1,132 @@
+import os
+from pathlib import Path
+from typing import List, Set
+from PIL import Image
+import hashlib
+from .database import SessionLocal
+from .models import Media
+from sqlalchemy import select
+
+# Supported media extensions
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.svg'}
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v'}
+GIF_EXTENSIONS = {'.gif'}
+
+ALL_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+
+class MediaScanner:
+    def __init__(self, root_dir: str):
+        self.root_dir = Path(root_dir).resolve()
+        self.db = SessionLocal()
+        self.thumbnails_dir = Path("thumbnails")
+        self.thumbnails_dir.mkdir(exist_ok=True)
+
+    def scan(self):
+        """Scan directory recursively for media files"""
+        print(f"Scanning directory: {self.root_dir}")
+        media_files = self._find_media_files()
+        print(f"Found {len(media_files)} media files")
+
+        for file_path in media_files:
+            self._process_media_file(file_path)
+
+        self.db.close()
+        print("Scan complete")
+
+    def _find_media_files(self) -> List[Path]:
+        """Find all media files in directory recursively"""
+        media_files = []
+
+        for root, dirs, files in os.walk(self.root_dir):
+            for file in files:
+                file_path = Path(root) / file
+                if file_path.suffix.lower() in ALL_EXTENSIONS:
+                    media_files.append(file_path)
+
+        return media_files
+
+    def _process_media_file(self, file_path: Path):
+        """Process a single media file"""
+        try:
+            # Check if already in database
+            existing = self.db.execute(
+                select(Media).where(Media.path == str(file_path))
+            ).scalar_one_or_none()
+
+            if existing:
+                print(f"Already indexed: {file_path.name}")
+                return
+
+            # Get file info
+            stat = file_path.stat()
+            file_size = stat.st_size
+
+            # Determine type
+            ext = file_path.suffix.lower()
+            if ext in VIDEO_EXTENSIONS:
+                media_type = "video"
+            elif ext == '.gif':
+                media_type = "gif"
+            else:
+                media_type = "image"
+
+            # Get dimensions and create thumbnail for images
+            width, height = None, None
+            thumbnail_path = None
+
+            if media_type in ["image", "gif"]:
+                try:
+                    with Image.open(file_path) as img:
+                        width, height = img.size
+
+                        # Create thumbnail
+                        thumbnail_path = self._create_thumbnail(file_path, img)
+                except Exception as e:
+                    print(f"Error processing image {file_path}: {e}")
+
+            # Add to database
+            media = Media(
+                path=str(file_path),
+                filename=file_path.name,
+                type=media_type,
+                size=file_size,
+                width=width,
+                height=height,
+                thumbnail_path=thumbnail_path
+            )
+            self.db.add(media)
+            self.db.commit()
+
+            print(f"Indexed: {file_path.name}")
+
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+            self.db.rollback()
+
+    def _create_thumbnail(self, file_path: Path, img: Image.Image) -> str:
+        """Create a thumbnail for an image"""
+        # Create unique thumbnail filename
+        file_hash = hashlib.md5(str(file_path).encode()).hexdigest()
+        thumbnail_name = f"{file_hash}.jpg"
+        thumbnail_path = self.thumbnails_dir / thumbnail_name
+
+        # Create thumbnail
+        img_copy = img.copy()
+        img_copy.thumbnail((300, 300), Image.Resampling.LANCZOS)
+
+        # Convert to RGB if necessary (for PNGs with transparency)
+        if img_copy.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img_copy.size, (255, 255, 255))
+            if img_copy.mode == 'P':
+                img_copy = img_copy.convert('RGBA')
+            background.paste(img_copy, mask=img_copy.split()[-1] if img_copy.mode in ('RGBA', 'LA') else None)
+            img_copy = background
+
+        img_copy.save(thumbnail_path, "JPEG", quality=85)
+
+        return str(thumbnail_path)
+
+    def __del__(self):
+        """Clean up database connection"""
+        if hasattr(self, 'db'):
+            self.db.close()
