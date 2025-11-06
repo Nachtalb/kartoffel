@@ -93,11 +93,22 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  scanDirectory: async (directory) => {
+  refreshScan: async () => {
     try {
-      await axios.post(`${API_URL}/scan`, { directory })
+      const response = await axios.post(`${API_URL}/scan/refresh`)
+      return response.data
     } catch (error) {
-      console.error('Failed to scan directory:', error)
+      console.error('Failed to refresh scan:', error)
+      throw error
+    }
+  },
+
+  getScanStatus: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/scan/status`)
+      return response.data
+    } catch (error) {
+      console.error('Failed to get scan status:', error)
       throw error
     }
   },

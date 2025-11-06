@@ -25,14 +25,14 @@ function TinderMode() {
   const handleTouchStart = (e) => {
     const touch = e.touches[0]
     const rect = cardRef.current.getBoundingClientRect()
-    const centerX = rect.left + rect.width / 2
-    const centerY = rect.top + rect.height / 2
+    const cardCenterX = rect.left + rect.width / 2
+    const cardCenterY = rect.top + rect.height / 2
 
     setDragStart({
-      x: touch.clientX - centerX,
-      y: touch.clientY - centerY,
-      centerX,
-      centerY,
+      touchStartX: touch.clientX,
+      touchStartY: touch.clientY,
+      cardCenterX,
+      cardCenterY,
     })
   }
 
@@ -42,17 +42,25 @@ function TinderMode() {
     e.preventDefault()
     const touch = e.touches[0]
 
-    const dx = touch.clientX - dragStart.centerX
-    const dy = touch.clientY - dragStart.centerY
+    // Calculate drag offset for card movement (relative to card center)
+    const cardDx = touch.clientX - dragStart.touchStartX
+    const cardDy = touch.clientY - dragStart.touchStartY
 
-    setDragCurrent({ x: dx, y: dy })
+    setDragCurrent({ x: cardDx, y: cardDy })
 
-    // Calculate distance from center
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    // Calculate position relative to screen center for pie selection
+    const screenCenterX = window.innerWidth / 2
+    const screenCenterY = window.innerHeight / 2
 
-    // Only select category if dragged far enough (50px threshold)
-    if (distance > 50) {
-      const category = getPieSlice(dx, dy)
+    const pieDx = touch.clientX - screenCenterX
+    const pieDy = touch.clientY - screenCenterY
+
+    // Calculate distance from screen center
+    const distance = Math.sqrt(pieDx * pieDx + pieDy * pieDy)
+
+    // Only select category if dragged far enough (100px threshold)
+    if (distance > 100) {
+      const category = getPieSlice(pieDx, pieDy)
       setSelectedCategory(category)
     } else {
       setSelectedCategory(null)
@@ -67,11 +75,17 @@ function TinderMode() {
       return
     }
 
-    // Calculate distance
-    const distance = Math.sqrt(dragCurrent.x ** 2 + dragCurrent.y ** 2)
+    // Calculate distance from screen center for final check
+    const screenCenterX = window.innerWidth / 2
+    const screenCenterY = window.innerHeight / 2
+    const finalTouchX = dragStart.touchStartX + dragCurrent.x
+    const finalTouchY = dragStart.touchStartY + dragCurrent.y
+    const pieDx = finalTouchX - screenCenterX
+    const pieDy = finalTouchY - screenCenterY
+    const distance = Math.sqrt(pieDx * pieDx + pieDy * pieDy)
 
     // If dragged far enough, categorize
-    if (distance > 50) {
+    if (distance > 100) {
       try {
         await categorizeMedia(currentMedia.id, [selectedCategory.id])
         nextTinderCard()
@@ -131,93 +145,8 @@ function TinderMode() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Pie Chart Overlay */}
-      {dragCurrent && (
-        <div className="absolute inset-0 pointer-events-none z-10">
-          <svg className="w-full h-full">
-            <defs>
-              {categories.map((category, index) => {
-                const sliceAngle = 360 / categories.length
-                const startAngle = index * sliceAngle - 90
-                const endAngle = (index + 1) * sliceAngle - 90
-
-                const centerX = window.innerWidth / 2
-                const centerY = window.innerHeight / 2
-                const radius = Math.min(window.innerWidth, window.innerHeight)
-
-                const startX = centerX + radius * Math.cos((startAngle * Math.PI) / 180)
-                const startY = centerY + radius * Math.sin((startAngle * Math.PI) / 180)
-                const endX = centerX + radius * Math.cos((endAngle * Math.PI) / 180)
-                const endY = centerY + radius * Math.sin((endAngle * Math.PI) / 180)
-
-                const largeArc = sliceAngle > 180 ? 1 : 0
-
-                return (
-                  <path
-                    key={category.id}
-                    d={`M ${centerX} ${centerY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`}
-                    fill={category.color}
-                    opacity={selectedCategory?.id === category.id ? 0.6 : 0.2}
-                  />
-                )
-              })}
-            </defs>
-            {categories.map((category, index) => {
-              const sliceAngle = 360 / categories.length
-              const startAngle = index * sliceAngle - 90
-              const endAngle = (index + 1) * sliceAngle - 90
-
-              const centerX = window.innerWidth / 2
-              const centerY = window.innerHeight / 2
-              const radius = Math.min(window.innerWidth, window.innerHeight)
-
-              const startX = centerX + radius * Math.cos((startAngle * Math.PI) / 180)
-              const startY = centerY + radius * Math.sin((startAngle * Math.PI) / 180)
-              const endX = centerX + radius * Math.cos((endAngle * Math.PI) / 180)
-              const endY = centerY + radius * Math.sin((endAngle * Math.PI) / 180)
-
-              const largeArc = sliceAngle > 180 ? 1 : 0
-
-              return (
-                <path
-                  key={category.id}
-                  d={`M ${centerX} ${centerY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`}
-                  fill={category.color}
-                  opacity={selectedCategory?.id === category.id ? 0.6 : 0.2}
-                />
-              )
-            })}
-          </svg>
-
-          {/* Category Labels */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {categories.map((category, index) => {
-              const sliceAngle = 360 / categories.length
-              const angle = (index * sliceAngle + sliceAngle / 2 - 90) * (Math.PI / 180)
-              const radius = 150
-
-              const x = Math.cos(angle) * radius
-              const y = Math.sin(angle) * radius
-
-              return (
-                <div
-                  key={category.id}
-                  className="absolute font-bold text-white text-lg drop-shadow-lg"
-                  style={{
-                    transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-                    opacity: selectedCategory?.id === category.id ? 1 : 0.7,
-                  }}
-                >
-                  {category.name}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Card */}
-      <div className="relative w-full max-w-md aspect-[3/4] z-20">
+      <div className="relative w-full max-w-md aspect-[3/4] z-10">
         <div
           ref={cardRef}
           className="absolute inset-0 bg-gray-800 rounded-2xl shadow-2xl overflow-hidden tinder-card"
@@ -255,6 +184,92 @@ function TinderMode() {
           {currentTinderIndex + 1} / {media.length}
         </div>
       </div>
+
+      {/* Pie Chart Overlay */}
+      {dragCurrent && (
+        <div className="fixed inset-0 pointer-events-none z-50">
+          <svg className="w-full h-full">
+            <defs>
+              {categories.map((category, index) => {
+                const sliceAngle = 360 / categories.length
+                const startAngle = index * sliceAngle - 90
+                const endAngle = (index + 1) * sliceAngle - 90
+
+                const centerX = window.innerWidth / 2
+                const centerY = window.innerHeight / 2
+                const radius = Math.min(window.innerWidth, window.innerHeight)
+
+                const startX = centerX + radius * Math.cos((startAngle * Math.PI) / 180)
+                const startY = centerY + radius * Math.sin((startAngle * Math.PI) / 180)
+                const endX = centerX + radius * Math.cos((endAngle * Math.PI) / 180)
+                const endY = centerY + radius * Math.sin((endAngle * Math.PI) / 180)
+
+                const largeArc = sliceAngle > 180 ? 1 : 0
+
+                return (
+                  <path
+                    key={category.id}
+                    d={`M ${centerX} ${centerY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`}
+                    fill={category.color}
+                    opacity={selectedCategory?.id === category.id ? 0.4 : 0.15}
+                  />
+                )
+              })}
+            </defs>
+            {categories.map((category, index) => {
+              const sliceAngle = 360 / categories.length
+              const startAngle = index * sliceAngle - 90
+              const endAngle = (index + 1) * sliceAngle - 90
+
+              const centerX = window.innerWidth / 2
+              const centerY = window.innerHeight / 2
+              const radius = Math.min(window.innerWidth, window.innerHeight)
+
+              const startX = centerX + radius * Math.cos((startAngle * Math.PI) / 180)
+              const startY = centerY + radius * Math.sin((startAngle * Math.PI) / 180)
+              const endX = centerX + radius * Math.cos((endAngle * Math.PI) / 180)
+              const endY = centerY + radius * Math.sin((endAngle * Math.PI) / 180)
+
+              const largeArc = sliceAngle > 180 ? 1 : 0
+
+              return (
+                <path
+                  key={category.id}
+                  d={`M ${centerX} ${centerY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`}
+                  fill={category.color}
+                  opacity={selectedCategory?.id === category.id ? 0.4 : 0.15}
+                />
+              )
+            })}
+          </svg>
+
+          {/* Category Labels */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            {categories.map((category, index) => {
+              const sliceAngle = 360 / categories.length
+              const angle = (index * sliceAngle + sliceAngle / 2 - 90) * (Math.PI / 180)
+              const radius = 150
+
+              const x = Math.cos(angle) * radius
+              const y = Math.sin(angle) * radius
+
+              return (
+                <div
+                  key={category.id}
+                  className="absolute font-bold text-white text-xl drop-shadow-lg pointer-events-none"
+                  style={{
+                    transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                    opacity: selectedCategory?.id === category.id ? 1 : 0.8,
+                    textShadow: '0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.6)',
+                  }}
+                >
+                  {category.name}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Skip button */}
       <div className="mt-16 flex gap-4">

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 from .database import init_db, get_db
 from .scanner import MediaScanner
@@ -13,7 +14,20 @@ from .models import Media, Category, MediaCategory
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+# Load environment variables
+load_dotenv()
+
+# Get media directory from environment
+MEDIA_DIRECTORY = os.getenv("MEDIA_DIRECTORY")
+if not MEDIA_DIRECTORY:
+    print("WARNING: MEDIA_DIRECTORY not set in environment. Auto-scanning disabled.")
+    print("Set MEDIA_DIRECTORY in .env file to enable automatic scanning.")
+
 app = FastAPI(title="Media Categorizer")
+
+# Global scanner instance for background tasks
+_scanner_instance = None
+_is_scanning = False
 
 # CORS middleware
 app.add_middleware(
@@ -50,8 +64,29 @@ class BulkCategorize(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application"""
+    global _scanner_instance, _is_scanning
+
     # Create thumbnails directory
     os.makedirs("thumbnails", exist_ok=True)
+
+    # Auto-scan media directory on startup if configured
+    if MEDIA_DIRECTORY and os.path.exists(MEDIA_DIRECTORY):
+        print(f"Starting automatic scan of {MEDIA_DIRECTORY}...")
+        _scanner_instance = MediaScanner(MEDIA_DIRECTORY)
+        _is_scanning = True
+
+        # Run scan in background
+        import threading
+        def scan_wrapper():
+            global _is_scanning
+            try:
+                _scanner_instance.scan()
+            finally:
+                _is_scanning = False
+
+        thread = threading.Thread(target=scan_wrapper)
+        thread.daemon = True
+        thread.start()
 
 @app.get("/")
 async def root():
@@ -68,11 +103,64 @@ async def scan_directory(request: ScanRequest, background_tasks: BackgroundTasks
 
     return {"status": "scanning", "directory": request.directory}
 
+@app.post("/api/scan/refresh")
+async def refresh_scan():
+    """Refresh the scan - rescan configured directory and clean up deleted files"""
+    global _scanner_instance, _is_scanning
+
+    if not MEDIA_DIRECTORY:
+        raise HTTPException(status_code=400, detail="MEDIA_DIRECTORY not configured")
+
+    if not os.path.exists(MEDIA_DIRECTORY):
+        raise HTTPException(status_code=404, detail="Media directory not found")
+
+    if _is_scanning:
+        return {"status": "already_scanning"}
+
+    # Clean up deleted files first
+    db = next(get_db())
+    media_items = db.execute(select(Media)).scalars().all()
+    deleted_count = 0
+
+    for media in media_items:
+        if not os.path.exists(media.path):
+            print(f"Removing deleted file from database: {media.path}")
+            db.delete(media)
+            deleted_count += 1
+
+    db.commit()
+
+    # Start new scan
+    _scanner_instance = MediaScanner(MEDIA_DIRECTORY)
+    _is_scanning = True
+
+    import threading
+    def scan_wrapper():
+        global _is_scanning
+        try:
+            _scanner_instance.scan()
+        finally:
+            _is_scanning = False
+
+    thread = threading.Thread(target=scan_wrapper)
+    thread.daemon = True
+    thread.start()
+
+    return {
+        "status": "scanning",
+        "directory": MEDIA_DIRECTORY,
+        "deleted_files": deleted_count
+    }
+
 @app.get("/api/scan/status")
 async def scan_status():
     """Get the current scan status"""
-    # This would be implemented with a proper task queue in production
-    return {"status": "idle"}
+    global _is_scanning
+
+    return {
+        "status": "scanning" if _is_scanning else "idle",
+        "directory": MEDIA_DIRECTORY
+    }
 
 @app.get("/api/media")
 async def get_media(
@@ -97,6 +185,7 @@ async def get_media(
     result = db.execute(query)
     media_items = result.scalars().all()
 
+    # Get categories for each media item
     return [
         {
             "id": m.id,
@@ -108,6 +197,12 @@ async def get_media(
             "height": m.height,
             "created_at": m.created_at.isoformat() if m.created_at else None,
             "thumbnail_path": m.thumbnail_path,
+            "categories": [
+                {"id": c.id, "name": c.name, "color": c.color}
+                for mc in m.categories
+                for c in [db.execute(select(Category).where(Category.id == mc.category_id)).scalar_one_or_none()]
+                if c
+            ]
         }
         for m in media_items
     ]

@@ -4,10 +4,34 @@
 
 echo "🎬 Starting Media Categorizer..."
 
+# Check for .env file
+if [ ! -f ".env" ]; then
+    echo "⚠️  No .env file found. Creating from template..."
+    if [ -f ".env.example" ]; then
+        cp .env.example .env
+        echo "Please edit .env and set MEDIA_DIRECTORY to your media folder path"
+    else
+        echo "MEDIA_DIRECTORY=/path/to/your/media" > .env
+        echo "Please edit .env and set MEDIA_DIRECTORY to your media folder path"
+    fi
+fi
+
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "⚠️  uv not found. Using pip instead..."
+    USE_UV=false
+else
+    USE_UV=true
+fi
+
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
-    python3 -m venv venv
+    if [ "$USE_UV" = true ]; then
+        uv venv
+    else
+        python3 -m venv venv
+    fi
 fi
 
 # Activate virtual environment
@@ -15,7 +39,11 @@ source venv/bin/activate
 
 # Install backend dependencies
 echo "📦 Installing backend dependencies..."
-pip install -q -r requirements.txt
+if [ "$USE_UV" = true ]; then
+    uv pip install -r requirements.txt
+else
+    pip install -q -r requirements.txt
+fi
 
 # Install frontend dependencies if needed
 if [ ! -d "frontend/node_modules" ]; then

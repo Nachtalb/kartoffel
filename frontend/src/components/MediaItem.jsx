@@ -65,6 +65,28 @@ function MediaItem({ item, onClick, isSelected, showCheckbox }) {
           GIF
         </div>
       )}
+
+      {/* Category badges */}
+      {item.categories && item.categories.length > 0 && !showCheckbox && (
+        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+          <div className="flex flex-wrap gap-1">
+            {item.categories.slice(0, 3).map((category) => (
+              <span
+                key={category.id}
+                className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
+                style={{ backgroundColor: category.color }}
+              >
+                {category.name}
+              </span>
+            ))}
+            {item.categories.length > 3 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-white font-medium">
+                +{item.categories.length - 3}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -4,41 +4,45 @@ import MediaItem from './MediaItem'
 import CategorySelector from './CategorySelector'
 
 function BulkEditMode() {
-  const { media, selectedMedia, toggleSelection, clearSelection, bulkCategorize, fetchMedia } = useStore()
+  const { media, selectedMedia, setSelection, clearSelection, bulkCategorize, fetchMedia } = useStore()
   const [isSelecting, setIsSelecting] = useState(false)
   const [showCategorySelector, setShowCategorySelector] = useState(false)
   const [autoScrollInterval, setAutoScrollInterval] = useState(null)
+  const [startIndex, setStartIndex] = useState(null)
+  const [currentIndex, setCurrentIndex] = useState(null)
   const containerRef = useRef(null)
-  const longPressTimer = useRef(null)
-  const lastSelectedIndex = useRef(null)
 
-  const handleTouchStart = (e, item, index) => {
-    // Start long press timer
-    longPressTimer.current = setTimeout(() => {
+  // Handle click/tap to start selection
+  const handleItemClick = (item, index) => {
+    if (!isSelecting) {
+      // First click - start selection
       setIsSelecting(true)
-      toggleSelection(item.id)
-      lastSelectedIndex.current = index
-    }, 300) // 300ms for long press
+      setStartIndex(index)
+      setCurrentIndex(index)
+      setSelection([item.id])
+    }
+  }
+
+  const selectRange = (start, end) => {
+    const minIndex = Math.min(start, end)
+    const maxIndex = Math.max(start, end)
+    const selectedIds = media.slice(minIndex, maxIndex + 1).map(m => m.id)
+    setSelection(selectedIds)
   }
 
   const handleTouchMove = (e) => {
-    // Cancel long press if moved too much
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-
     if (isSelecting) {
       e.preventDefault()
       const touch = e.touches[0]
       const element = document.elementFromPoint(touch.clientX, touch.clientY)
 
       if (element) {
-        const mediaElement = element.closest('[data-media-id]')
+        const mediaElement = element.closest('[data-media-index]')
         if (mediaElement) {
-          const mediaId = parseInt(mediaElement.dataset.mediaId)
-          if (!selectedMedia.has(mediaId)) {
-            toggleSelection(mediaId)
+          const index = parseInt(mediaElement.dataset.mediaIndex)
+          if (index !== currentIndex) {
+            setCurrentIndex(index)
+            selectRange(startIndex, index)
           }
         }
       }
@@ -74,11 +78,6 @@ function BulkEditMode() {
   }
 
   const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-
     setIsSelecting(false)
 
     if (autoScrollInterval) {
@@ -122,7 +121,9 @@ function BulkEditMode() {
             <div
               key={item.id}
               data-media-id={item.id}
-              onTouchStart={(e) => handleTouchStart(e, item, index)}
+              data-media-index={index}
+              onClick={() => handleItemClick(item, index)}
+              onTouchStart={() => handleItemClick(item, index)}
             >
               <MediaItem
                 item={item}

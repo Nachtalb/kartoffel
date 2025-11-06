@@ -4,13 +4,27 @@ import GalleryMode from './components/GalleryMode'
 import BulkEditMode from './components/BulkEditMode'
 import TinderMode from './components/TinderMode'
 import CategoryManager from './components/CategoryManager'
-import Scanner from './components/Scanner'
 
 function App() {
   const [mode, setMode] = useState('gallery') // gallery, bulk, tinder
   const [showCategoryManager, setShowCategoryManager] = useState(false)
-  const [showScanner, setShowScanner] = useState(false)
-  const { fetchMedia, fetchCategories, media } = useStore()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { fetchMedia, fetchCategories, media, refreshScan } = useStore()
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      const result = await refreshScan()
+      // Wait a bit for the scan to start
+      setTimeout(async () => {
+        await fetchMedia()
+        setIsRefreshing(false)
+      }, 2000)
+    } catch (error) {
+      alert('Failed to refresh: ' + error.message)
+      setIsRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     fetchCategories()
@@ -25,10 +39,11 @@ function App() {
           <h1 className="text-xl font-bold">Media Categorizer</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowScanner(true)}
-              className="px-3 py-2 bg-green-600 rounded-lg text-sm font-medium active:bg-green-700"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-3 py-2 bg-green-600 rounded-lg text-sm font-medium active:bg-green-700 disabled:opacity-50"
             >
-              Scan
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
             <button
               onClick={() => setShowCategoryManager(true)}
@@ -89,9 +104,6 @@ function App() {
       {/* Modals */}
       {showCategoryManager && (
         <CategoryManager onClose={() => setShowCategoryManager(false)} />
-      )}
-      {showScanner && (
-        <Scanner onClose={() => setShowScanner(false)} />
       )}
     </div>
   )
