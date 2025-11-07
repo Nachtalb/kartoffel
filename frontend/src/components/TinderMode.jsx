@@ -11,6 +11,19 @@ function TinderMode() {
 
   const currentMedia = media[currentTinderIndex]
 
+  // Preload next images for faster loading
+  useEffect(() => {
+    const preloadCount = 3
+    for (let i = 1; i <= preloadCount; i++) {
+      const nextIndex = currentTinderIndex + i
+      if (nextIndex < media.length) {
+        const nextMedia = media[nextIndex]
+        const img = new Image()
+        img.src = `/media/${nextMedia.path}`
+      }
+    }
+  }, [currentTinderIndex, media])
+
   // Calculate which category triangle the point is in
   const getCategoryFromAngle = (x, y) => {
     if (!categories.length) return null
