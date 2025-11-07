@@ -8,7 +8,7 @@ function UploadModal({ onClose, onUploadComplete }) {
   const [uploadStatus, setUploadStatus] = useState(null)
   const fileInputRef = useRef(null)
 
-  // ESC key to close
+  // ESC key to close and prevent body scroll
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && !uploading) {
@@ -16,8 +16,14 @@ function UploadModal({ onClose, onUploadComplete }) {
       }
     }
 
+    // Prevent body scroll on mobile
+    document.body.style.overflow = 'hidden'
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
   }, [onClose, uploading])
 
   const handleFileSelect = (e) => {
@@ -43,6 +49,7 @@ function UploadModal({ onClose, onUploadComplete }) {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 300000, // 5 minutes timeout for large uploads
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
@@ -88,8 +95,19 @@ function UploadModal({ onClose, onUploadComplete }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[90vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e) => {
+        // Only close if clicking the backdrop and not uploading
+        if (e.target === e.currentTarget && !uploading) {
+          onClose()
+        }
+      }}
+    >
+      <div
+        className="bg-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">Upload Files</h2>
