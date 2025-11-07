@@ -16,13 +16,23 @@ function MediaViewer({ item, onClose }) {
     }
   }
 
-  // Prevent body scroll when viewer is open
+  // Prevent body scroll when viewer is open and handle ESC key
   useEffect(() => {
     document.body.style.overflow = 'hidden'
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
     return () => {
       document.body.style.overflow = ''
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [])
+  }, [onClose])
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
