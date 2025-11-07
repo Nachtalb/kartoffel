@@ -40,7 +40,7 @@ class MediaScanner:
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate gxhash of a file"""
-        hasher = gxhash.GxHash128()
+        hasher = gxhash.GxHash128(seed=0)
         with open(file_path, 'rb') as f:
             file_hash = hasher.hash_file(f)
         return str(file_hash)
