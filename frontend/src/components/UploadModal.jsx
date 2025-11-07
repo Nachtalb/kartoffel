@@ -6,6 +6,7 @@ function UploadModal({ onClose, onUploadComplete }) {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [fileProgress, setFileProgress] = useState({})
+  const [fileStatuses, setFileStatuses] = useState({}) // 'pending', 'uploading', 'done', 'duplicate', 'error'
   const [uploadStatus, setUploadStatus] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -31,6 +32,8 @@ function UploadModal({ onClose, onUploadComplete }) {
     const files = Array.from(e.target.files)
     setSelectedFiles(files)
     setUploadStatus(null)
+    setFileStatuses({})
+    setFileProgress({})
   }
 
   const handleUpload = async () => {
@@ -39,81 +42,93 @@ function UploadModal({ onClose, onUploadComplete }) {
     setUploading(true)
     setProgress(0)
     setFileProgress({})
+    setFileStatuses({})
     setUploadStatus(null)
 
-    const formData = new FormData()
-    const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0)
-    const fileSizes = selectedFiles.map(f => f.size)
+    let uploaded = 0
+    let duplicates = 0
+    let errors = 0
+    const duplicateMessages = []
+    const errorMessages = []
 
-    selectedFiles.forEach((file) => {
+    // Upload files in batches of 3 to show immediate feedback
+    const uploadFile = async (file, index) => {
+      setFileStatuses(prev => ({ ...prev, [index]: 'uploading' }))
+
+      const formData = new FormData()
       formData.append('files', file)
+
+      try {
+        const response = await axios.post('/api/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 300000,
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            )
+            setFileProgress(prev => ({ ...prev, [index]: percentCompleted }))
+          },
+        })
+
+        // Check response
+        if (response.data.duplicates && response.data.duplicates.length > 0) {
+          setFileStatuses(prev => ({ ...prev, [index]: 'duplicate' }))
+          duplicates++
+          duplicateMessages.push(...response.data.duplicates)
+        } else if (response.data.errors && response.data.errors.length > 0) {
+          setFileStatuses(prev => ({ ...prev, [index]: 'error' }))
+          errors++
+          errorMessages.push(...response.data.errors)
+        } else {
+          setFileStatuses(prev => ({ ...prev, [index]: 'done' }))
+          uploaded++
+        }
+      } catch (error) {
+        setFileStatuses(prev => ({ ...prev, [index]: 'error' }))
+        errors++
+        errorMessages.push(`${file.name}: ${error.response?.data?.detail || error.message}`)
+      }
+    }
+
+    // Process files in batches of 3
+    const batchSize = 3
+    for (let i = 0; i < selectedFiles.length; i += batchSize) {
+      const batch = selectedFiles.slice(i, i + batchSize)
+      const promises = batch.map((file, batchIndex) =>
+        uploadFile(file, i + batchIndex)
+      )
+      await Promise.all(promises)
+
+      // Update overall progress
+      setProgress(Math.round((Math.min(i + batchSize, selectedFiles.length) / selectedFiles.length) * 100))
+    }
+
+    // Final status
+    let message = `Uploaded ${uploaded} file(s)`
+    if (duplicates > 0) message += `, ${duplicates} duplicate(s) skipped`
+    if (errors > 0) message += `, ${errors} error(s)`
+
+    setUploadStatus({
+      success: errors === 0,
+      message,
+      errors: errorMessages,
+      duplicates: duplicateMessages,
     })
 
-    try {
-      const response = await axios.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 300000, // 5 minutes timeout for large uploads
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          )
-          setProgress(percentCompleted)
+    setUploading(false)
 
-          // Calculate per-file progress based on file sizes
-          const newFileProgress = {}
-          let bytesProcessed = progressEvent.loaded
-          for (let i = 0; i < selectedFiles.length; i++) {
-            const fileSize = fileSizes[i]
-            if (bytesProcessed >= fileSize) {
-              newFileProgress[i] = 100
-              bytesProcessed -= fileSize
-            } else if (bytesProcessed > 0) {
-              newFileProgress[i] = Math.round((bytesProcessed / fileSize) * 100)
-              bytesProcessed = 0
-            } else {
-              newFileProgress[i] = 0
-            }
-          }
-          setFileProgress(newFileProgress)
-        },
-      })
+    // Notify parent to refresh media list
+    if (onUploadComplete && uploaded > 0) {
+      onUploadComplete()
+    }
 
-      const duplicates = response.data.duplicates || []
-      const totalProcessed = response.data.uploaded + duplicates.length + response.data.errors.length
-
-      let message = `Successfully uploaded ${response.data.uploaded} file(s)`
-      if (duplicates.length > 0) {
-        message += `, ${duplicates.length} duplicate(s) skipped`
-      }
-
-      setUploadStatus({
-        success: true,
-        message,
-        errors: response.data.errors,
-        duplicates,
-      })
-
-      // Notify parent to refresh media list
-      if (onUploadComplete) {
-        onUploadComplete()
-      }
-
-      // Reset after a delay
+    // Auto close if all successful
+    if (uploaded > 0 && duplicates === 0 && errors === 0) {
       setTimeout(() => {
-        if (response.data.errors.length === 0 && duplicates.length === 0) {
-          onClose()
-        }
+        onClose()
       }, 2000)
-    } catch (error) {
-      setUploadStatus({
-        success: false,
-        message: error.response?.data?.detail || 'Upload failed',
-        errors: [],
-      })
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -188,26 +203,43 @@ function UploadModal({ onClose, onUploadComplete }) {
                 Selected Files ({selectedFiles.length})
               </h3>
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {selectedFiles.map((file, index) => (
-                  <div
-                    key={index}
-                    className="relative bg-gray-700 rounded text-sm overflow-hidden"
-                  >
-                    <div className="flex items-center justify-between p-2">
-                      <span className="truncate flex-1 text-white">{file.name}</span>
-                      <span className="text-gray-400 ml-2">{formatFileSize(file.size)}</span>
-                    </div>
-                    {/* Per-file progress bar */}
-                    {uploading && fileProgress[index] !== undefined && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
-                        <div
-                          className="h-full bg-blue-500 transition-all duration-300"
-                          style={{ width: `${fileProgress[index]}%` }}
-                        />
+                {selectedFiles.map((file, index) => {
+                  const status = fileStatuses[index]
+                  const getStatusBadge = () => {
+                    if (status === 'uploading') {
+                      return <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded">Uploading</span>
+                    } else if (status === 'done') {
+                      return <span className="px-2 py-0.5 bg-green-600 text-white text-xs rounded">✓ Done</span>
+                    } else if (status === 'duplicate') {
+                      return <span className="px-2 py-0.5 bg-yellow-600 text-white text-xs rounded">Duplicate</span>
+                    } else if (status === 'error') {
+                      return <span className="px-2 py-0.5 bg-red-600 text-white text-xs rounded">Error</span>
+                    }
+                    return null
+                  }
+
+                  return (
+                    <div
+                      key={index}
+                      className="relative bg-gray-700 rounded text-sm overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between gap-2 p-2">
+                        <span className="truncate flex-1 text-white">{file.name}</span>
+                        {getStatusBadge()}
+                        <span className="text-gray-400 ml-2">{formatFileSize(file.size)}</span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {/* Per-file progress bar */}
+                      {uploading && fileProgress[index] !== undefined && status === 'uploading' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                          <div
+                            className="h-full bg-blue-500 transition-all duration-300"
+                            style={{ width: `${fileProgress[index]}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

@@ -13,6 +13,8 @@ function BulkEditMode({ onRefresh }) {
   const [lastShiftRange, setLastShiftRange] = useState(null)
   const [touchStartPos, setTouchStartPos] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [isLongPressing, setIsLongPressing] = useState(false)
+  const [longPressTimer, setLongPressTimer] = useState(null)
   const [lastTouchTime, setLastTouchTime] = useState(0)
   const containerRef = useRef(null)
 
@@ -53,11 +55,33 @@ function BulkEditMode({ onRefresh }) {
     }
   }
 
-  // Touch handlers for mobile
+  // Touch handlers for mobile - long press selection like Android gallery
   const handleTouchStart = (e, item, index) => {
     const touch = e.touches[0]
-    setTouchStartPos({ x: touch.clientX, y: touch.clientY, time: Date.now() })
+    setTouchStartPos({
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+      item,
+      index
+    })
     setIsDragging(false)
+    setIsLongPressing(false)
+
+    // Start long-press timer (500ms like Android)
+    const timer = setTimeout(() => {
+      setIsLongPressing(true)
+      setIsDragging(true)
+      // Select the item on long press
+      if (!selectedMedia.has(item.id)) {
+        toggleSelection(item.id)
+      }
+      // Optional: vibrate on long press (if supported)
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+    }, 500)
+    setLongPressTimer(timer)
   }
 
   const handleTouchMove = (e) => {
@@ -67,21 +91,24 @@ function BulkEditMode({ onRefresh }) {
     const dx = touch.clientX - touchStartPos.x
     const dy = touch.clientY - touchStartPos.y
     const distance = Math.sqrt(dx * dx + dy * dy)
-    const timeSinceStart = Date.now() - touchStartPos.time
 
-    // Only start dragging if moved more than 20px within first 300ms
-    if (distance > 20 && timeSinceStart < 300) {
-      setIsDragging(true)
+    // Cancel long press if moved too much before timer completes
+    if (distance > 10 && !isLongPressing) {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer)
+        setLongPressTimer(null)
+      }
+      return
     }
 
-    if (isDragging) {
+    // If long press activated, enable dragging selection
+    if (isLongPressing) {
       e.preventDefault()
       const element = document.elementFromPoint(touch.clientX, touch.clientY)
 
       if (element) {
         const mediaElement = element.closest('[data-media-index]')
         if (mediaElement) {
-          const index = parseInt(mediaElement.dataset.mediaIndex)
           const mediaId = parseInt(mediaElement.dataset.mediaId)
 
           // Add to selection if not already selected
@@ -93,7 +120,7 @@ function BulkEditMode({ onRefresh }) {
 
       // Auto-scroll logic
       const scrollThreshold = 100
-      const scrollSpeed = 5
+      const scrollSpeed = 8
 
       if (touch.clientY < scrollThreshold && containerRef.current) {
         if (!autoScrollInterval) {
@@ -119,15 +146,20 @@ function BulkEditMode({ onRefresh }) {
   }
 
   const handleTouchEnd = (e, item, index) => {
+    // Clear timers
     if (autoScrollInterval) {
       clearInterval(autoScrollInterval)
       setAutoScrollInterval(null)
     }
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
 
-    // If not dragging and tap was quick, toggle selection
-    if (!isDragging && touchStartPos) {
+    // If not long pressing and tap was quick, toggle selection
+    if (!isLongPressing && !isDragging && touchStartPos) {
       const timeSinceStart = Date.now() - touchStartPos.time
-      if (timeSinceStart < 300) {
+      if (timeSinceStart < 500) {
         e.preventDefault() // Prevent click event from firing
         setLastTouchTime(Date.now()) // Track touch time to ignore ghost clicks
         toggleSelection(item.id)
@@ -138,6 +170,7 @@ function BulkEditMode({ onRefresh }) {
 
     setTouchStartPos(null)
     setIsDragging(false)
+    setIsLongPressing(false)
   }
 
   const handleCategorize = async (categoryIds) => {
