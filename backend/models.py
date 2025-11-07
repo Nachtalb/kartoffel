@@ -14,6 +14,7 @@ class Media(Base):
     width = Column(Integer)
     height = Column(Integer)
     thumbnail_path = Column(String)
+    file_hash = Column(String, index=True)  # gxhash hash for duplicate detection
     created_at = Column(DateTime, default=datetime.utcnow)
     modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

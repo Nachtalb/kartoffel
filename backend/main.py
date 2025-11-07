@@ -7,6 +7,7 @@ from typing import List, Optional
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import gxhash
 
 from .database import init_db, get_db
 from .scanner import MediaScanner
@@ -176,7 +177,7 @@ async def scan_status():
     }
 
 @app.post("/api/upload")
-async def upload_files(files: List[UploadFile] = File(...)):
+async def upload_files(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
     """Upload multiple media files"""
     if not MEDIA_DIRECTORY:
         raise HTTPException(status_code=400, detail="MEDIA_DIRECTORY not configured")
@@ -186,6 +187,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
 
     uploaded_files = []
     errors = []
+    duplicates = []
 
     for file in files:
         try:
@@ -194,6 +196,23 @@ async def upload_files(files: List[UploadFile] = File(...)):
             from .scanner import ALL_EXTENSIONS
             if file_ext not in ALL_EXTENSIONS:
                 errors.append(f"{file.filename}: Unsupported file type")
+                continue
+
+            # Read file content
+            content = await file.read()
+
+            # Calculate hash to check for duplicates
+            hasher = gxhash.Gxhash128()
+            hasher.update(content)
+            file_hash = hasher.hexdigest()
+
+            # Check if file with same hash already exists
+            existing = db.execute(
+                select(Media).where(Media.file_hash == file_hash)
+            ).scalar_one_or_none()
+
+            if existing:
+                duplicates.append(f"{file.filename}: Duplicate of {existing.filename}")
                 continue
 
             # Save file to media directory
@@ -207,7 +226,6 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 counter += 1
 
             # Write file
-            content = await file.read()
             with open(file_path, "wb") as f:
                 f.write(content)
 
@@ -224,6 +242,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
     return {
         "uploaded": len(uploaded_files),
         "files": uploaded_files,
+        "duplicates": duplicates,
         "errors": errors
     }
 

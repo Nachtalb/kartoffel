@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Set
 from PIL import Image
 import hashlib
+import gxhash
 from .database import SessionLocal
 from .models import Media
 from sqlalchemy import select
@@ -37,6 +38,15 @@ class MediaScanner:
         """Public method to process a single file"""
         return self._process_media_file(file_path)
 
+    def _calculate_file_hash(self, file_path: Path) -> str:
+        """Calculate gxhash of a file"""
+        hasher = gxhash.Gxhash128()
+        with open(file_path, 'rb') as f:
+            # Read file in chunks to handle large files
+            while chunk := f.read(8192):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
     def _find_media_files(self) -> List[Path]:
         """Find all media files in directory recursively"""
         media_files = []
@@ -52,7 +62,19 @@ class MediaScanner:
     def _process_media_file(self, file_path: Path):
         """Process a single media file"""
         try:
-            # Check if already in database
+            # Calculate file hash first
+            file_hash = self._calculate_file_hash(file_path)
+
+            # Check if file with same hash already exists (duplicate)
+            existing_hash = self.db.execute(
+                select(Media).where(Media.file_hash == file_hash)
+            ).scalar_one_or_none()
+
+            if existing_hash:
+                print(f"Duplicate file (same content): {file_path.name} -> {existing_hash.filename}")
+                return
+
+            # Check if already in database by path
             existing = self.db.execute(
                 select(Media).where(Media.path == str(file_path))
             ).scalar_one_or_none()
@@ -96,7 +118,8 @@ class MediaScanner:
                 size=file_size,
                 width=width,
                 height=height,
-                thumbnail_path=thumbnail_path
+                thumbnail_path=thumbnail_path,
+                file_hash=file_hash
             )
             self.db.add(media)
             self.db.commit()

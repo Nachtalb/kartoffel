@@ -80,10 +80,19 @@ function UploadModal({ onClose, onUploadComplete }) {
         },
       })
 
+      const duplicates = response.data.duplicates || []
+      const totalProcessed = response.data.uploaded + duplicates.length + response.data.errors.length
+
+      let message = `Successfully uploaded ${response.data.uploaded} file(s)`
+      if (duplicates.length > 0) {
+        message += `, ${duplicates.length} duplicate(s) skipped`
+      }
+
       setUploadStatus({
         success: true,
-        message: `Successfully uploaded ${response.data.uploaded} file(s)`,
+        message,
         errors: response.data.errors,
+        duplicates,
       })
 
       // Notify parent to refresh media list
@@ -93,7 +102,7 @@ function UploadModal({ onClose, onUploadComplete }) {
 
       // Reset after a delay
       setTimeout(() => {
-        if (response.data.errors.length === 0) {
+        if (response.data.errors.length === 0 && duplicates.length === 0) {
           onClose()
         }
       }, 2000)
@@ -227,12 +236,25 @@ function UploadModal({ onClose, onUploadComplete }) {
               }`}
             >
               <p className="font-medium">{uploadStatus.message}</p>
+              {uploadStatus.duplicates && uploadStatus.duplicates.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-medium text-yellow-400">Duplicates skipped:</p>
+                  <ul className="mt-1 text-sm space-y-1 text-yellow-300">
+                    {uploadStatus.duplicates.map((duplicate, index) => (
+                      <li key={index}>• {duplicate}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {uploadStatus.errors.length > 0 && (
-                <ul className="mt-2 text-sm space-y-1">
-                  {uploadStatus.errors.map((error, index) => (
-                    <li key={index}>• {error}</li>
-                  ))}
-                </ul>
+                <div className="mt-3">
+                  <p className="text-sm font-medium">Errors:</p>
+                  <ul className="mt-1 text-sm space-y-1">
+                    {uploadStatus.errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}
