@@ -52,7 +52,7 @@ function UploadModal({ onClose, onUploadComplete }) {
       const duplicateMessages = []
       const errorMessages = []
 
-      // Upload files in batches of 3 to show immediate feedback
+      // Upload a single file
       const uploadFile = async (file, index) => {
         try {
           setFileStatuses(prev => ({ ...prev, [index]: 'uploading' }))
@@ -94,18 +94,33 @@ function UploadModal({ onClose, onUploadComplete }) {
         }
       }
 
-      // Process files in batches of 3
-      const batchSize = 3
-      for (let i = 0; i < selectedFiles.length; i += batchSize) {
-        const batch = selectedFiles.slice(i, i + batchSize)
-        const promises = batch.map((file, batchIndex) =>
-          uploadFile(file, i + batchIndex)
-        )
-        await Promise.all(promises)
+      // Upload with continuous concurrency (always keep 3 uploads active)
+      const concurrency = 3
+      const executing = []
+      let completed = 0
 
-        // Update overall progress
-        setProgress(Math.round((Math.min(i + batchSize, selectedFiles.length) / selectedFiles.length) * 100))
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i]
+
+        // Create upload promise
+        const promise = uploadFile(file, i).then(() => {
+          // Remove from executing queue
+          executing.splice(executing.indexOf(promise), 1)
+          // Update progress
+          completed++
+          setProgress(Math.round((completed / selectedFiles.length) * 100))
+        })
+
+        executing.push(promise)
+
+        // Wait for one to finish if we've hit the concurrency limit
+        if (executing.length >= concurrency) {
+          await Promise.race(executing)
+        }
       }
+
+      // Wait for all remaining uploads to complete
+      await Promise.all(executing)
 
       // Final status
       let message = `Uploaded ${uploaded} file(s)`
