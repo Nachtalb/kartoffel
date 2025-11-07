@@ -7,7 +7,6 @@ function TinderMode({ onRefresh }) {
   const [dragStart, setDragStart] = useState(null)
   const [dragCurrent, setDragCurrent] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [preloadedBlobs, setPreloadedBlobs] = useState({})
   const cardRef = useRef(null)
   const videoRef = useRef(null)
 
@@ -21,75 +20,6 @@ function TinderMode({ onRefresh }) {
       })
     }
   }, [currentMedia])
-
-  // Preload current and next media as blobs for instant loading
-  useEffect(() => {
-    const preloadCount = 3
-    const newBlobs = {}
-    const loadPromises = []
-
-    // Load current and next few items as blobs
-    for (let i = 0; i <= preloadCount; i++) {
-      const nextIndex = currentTinderIndex + i
-      if (nextIndex < media.length && nextIndex >= 0) {
-        const nextMedia = media[nextIndex]
-
-        // Skip if already preloaded
-        if (preloadedBlobs[nextIndex]) {
-          newBlobs[nextIndex] = preloadedBlobs[nextIndex]
-          continue
-        }
-
-        const url = `/media/${nextMedia.path}`
-        const promise = fetch(url)
-          .then(response => response.blob())
-          .then(blob => {
-            const blobUrl = URL.createObjectURL(blob)
-            newBlobs[nextIndex] = blobUrl
-          })
-          .catch(error => {
-            console.error(`Failed to preload ${nextMedia.filename}:`, error)
-          })
-
-        loadPromises.push(promise)
-      }
-    }
-
-    // Update state once all promises resolve
-    Promise.all(loadPromises).then(() => {
-      setPreloadedBlobs(prev => {
-        // Clean up old blobs that are no longer needed
-        const minIndex = Math.max(0, currentTinderIndex - 1)
-        const maxIndex = currentTinderIndex + preloadCount + 1
-
-        Object.keys(prev).forEach(key => {
-          const idx = parseInt(key)
-          if (idx < minIndex || idx > maxIndex) {
-            URL.revokeObjectURL(prev[key])
-            delete prev[key]
-          }
-        })
-
-        return { ...prev, ...newBlobs }
-      })
-    })
-
-    // Cleanup on unmount
-    return () => {
-      Object.values(newBlobs).forEach(url => {
-        if (url && !preloadedBlobs[url]) {
-          URL.revokeObjectURL(url)
-        }
-      })
-    }
-  }, [currentTinderIndex, media])
-
-  // Cleanup all blobs on unmount
-  useEffect(() => {
-    return () => {
-      Object.values(preloadedBlobs).forEach(url => URL.revokeObjectURL(url))
-    }
-  }, [])
 
   // Calculate which category triangle the point is in
   const getCategoryFromAngle = (x, y) => {
@@ -286,7 +216,7 @@ function TinderMode({ onRefresh }) {
           {currentMedia.type === 'video' ? (
             <video
               ref={videoRef}
-              src={preloadedBlobs[currentTinderIndex] || `/media/${currentMedia.path}`}
+              src={`/media/${currentMedia.path}`}
               className="w-full h-full object-contain pointer-events-none"
               controls={!dragStart}
               autoPlay
@@ -296,7 +226,7 @@ function TinderMode({ onRefresh }) {
             />
           ) : (
             <img
-              src={preloadedBlobs[currentTinderIndex] || (currentMedia.thumbnail_path ? `/thumbnails/${currentMedia.thumbnail_path.split('/').pop()}` : `/media/${currentMedia.path}`)}
+              src={currentMedia.thumbnail_path ? `/thumbnails/${currentMedia.thumbnail_path.split('/').pop()}` : `/media/${currentMedia.path}`}
               alt={currentMedia.filename}
               className="w-full h-full object-contain pointer-events-none"
               draggable={false}
