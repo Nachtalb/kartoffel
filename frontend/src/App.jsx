@@ -25,14 +25,8 @@ function App() {
     setMode(newMode)
     window.location.hash = newMode
 
-    // Reload media with appropriate filters for the mode
-    if (newMode === 'tinder') {
-      // Tinder mode: only show uncategorized items
-      fetchMedia(null, true)
-    } else {
-      // Gallery and bulk: show all items
-      fetchMedia()
-    }
+    // By default, show only uncategorized items
+    fetchMedia(null, true)
   }
 
   const handleRefresh = async () => {
@@ -41,7 +35,7 @@ function App() {
       const result = await refreshScan()
       // Wait a bit for the scan to start
       setTimeout(async () => {
-        await fetchMedia()
+        await fetchMedia(null, true) // Show only uncategorized
         setIsRefreshing(false)
       }, 2000)
     } catch (error) {
@@ -53,25 +47,16 @@ function App() {
   useEffect(() => {
     fetchCategories()
 
-    // Load appropriate data for initial mode
-    const initialMode = getInitialMode()
-    if (initialMode === 'tinder') {
-      fetchMedia(null, true) // Only uncategorized
-    } else {
-      fetchMedia() // All items
-    }
+    // By default, show only uncategorized items
+    fetchMedia(null, true)
 
     // Listen for hash changes (browser back/forward)
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
       if (hash === 'gallery' || hash === 'bulk' || hash === 'tinder') {
         setMode(hash)
-        // Reload data for the new mode
-        if (hash === 'tinder') {
-          fetchMedia(null, true)
-        } else {
-          fetchMedia()
-        }
+        // By default, show only uncategorized items
+        fetchMedia(null, true)
       }
     }
 

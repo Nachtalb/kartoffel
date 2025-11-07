@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/useStore'
+import CategoryLegend from './CategoryLegend'
 
 function TinderMode() {
   const { media, currentTinderIndex, nextTinderCard, resetTinder, categories, categorizeMedia, fetchMedia } = useStore()
@@ -307,12 +308,14 @@ function TinderMode() {
 
       {/* Instructions */}
       {!dragCurrent && (
-        <div className="absolute bottom-4 left-0 right-0 text-center text-gray-500 text-sm">
+        <div className="absolute bottom-16 left-0 right-0 text-center text-gray-500 text-sm">
           <span className="hidden sm:inline">Drag to categorize • Press 1-9 • </span>
           <span className="sm:hidden">Drag to categorize • </span>
           Click buttons below
         </div>
       )}
+
+      <CategoryLegend />
     </div>
   )
 }

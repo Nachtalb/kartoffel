@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import MediaItem from './MediaItem'
 import MediaViewer from './MediaViewer'
+import CategoryLegend from './CategoryLegend'
 
 function GalleryMode() {
   const { media } = useStore()
   const [selectedItem, setSelectedItem] = useState(null)
 
   return (
-    <div className="h-full overflow-y-auto overscroll-contain">
+    <div className="h-full overflow-y-auto overscroll-contain pb-12">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-4">
         {media.map((item) => (
           <MediaItem
@@ -34,6 +35,8 @@ function GalleryMode() {
           onClose={() => setSelectedItem(null)}
         />
       )}
+
+      <CategoryLegend />
     </div>
   )
 }

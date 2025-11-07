@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import MediaItem from './MediaItem'
 import CategorySelector from './CategorySelector'
+import CategoryLegend from './CategoryLegend'
 
 function BulkEditMode() {
   const { media, selectedMedia, toggleSelection, setSelection, clearSelection, bulkCategorize, fetchMedia, categories } = useStore()
@@ -237,6 +238,8 @@ function BulkEditMode() {
           onClose={() => setShowCategorySelector(false)}
         />
       )}
+
+      {selectedMedia.size === 0 && <CategoryLegend />}
     </div>
   )
 }
