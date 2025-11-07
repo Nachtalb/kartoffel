@@ -12,11 +12,17 @@ function BulkEditMode() {
   const [lastShiftRange, setLastShiftRange] = useState(null)
   const [touchStartPos, setTouchStartPos] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [lastTouchTime, setLastTouchTime] = useState(0)
   const containerRef = useRef(null)
 
   // Handle click with modifier keys
   const handleItemClick = (e, item, index) => {
     e.preventDefault()
+
+    // Ignore click events that come immediately after touch events (ghost clicks)
+    if (Date.now() - lastTouchTime < 500) {
+      return
+    }
 
     if (e.shiftKey && lastClickedIndex !== null) {
       // Shift+click: select range from last clicked index to current
@@ -121,8 +127,11 @@ function BulkEditMode() {
     if (!isDragging && touchStartPos) {
       const timeSinceStart = Date.now() - touchStartPos.time
       if (timeSinceStart < 300) {
+        e.preventDefault() // Prevent click event from firing
+        setLastTouchTime(Date.now()) // Track touch time to ignore ghost clicks
         toggleSelection(item.id)
         setLastClickedIndex(index)
+        setLastShiftRange(null)
       }
     }
 
