@@ -23,7 +23,7 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showCategorized, setShowCategorized] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
-  const { fetchMedia, fetchCategories, media, refreshScan } = useStore()
+  const { fetchMedia, fetchCategories, media, refreshScan, resetTinder } = useStore()
 
   // Apply current filters
   const applyFilters = useCallback(() => {
@@ -43,6 +43,10 @@ function App() {
   const changeMode = (newMode) => {
     setMode(newMode)
     window.location.hash = newMode
+    // Reset Tinder index when switching to Tinder mode
+    if (newMode === 'tinder') {
+      resetTinder()
+    }
     applyFilters()
   }
 
@@ -52,12 +56,20 @@ function App() {
     if (value) {
       setSelectedCategoryId(null) // Clear category filter when showing all
     }
+    // Reset Tinder index when filters change
+    if (mode === 'tinder') {
+      resetTinder()
+    }
   }
 
   const handleCategoryChange = (categoryId) => {
     setSelectedCategoryId(categoryId)
     if (categoryId) {
       setShowCategorized(true) // Auto-enable show categorized when filtering by category
+    }
+    // Reset Tinder index when filters change
+    if (mode === 'tinder') {
+      resetTinder()
     }
   }
 

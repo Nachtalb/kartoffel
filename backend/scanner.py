@@ -103,42 +103,20 @@ class MediaScanner:
                         print(f"✗ Error deleting duplicate file {file_path.name}: {e}")
                     return
                 else:
-                    # Existing has no categories, delete it and process the new one
-                    # This allows the new file location to be indexed instead
+                    # Both uncategorized - keep the first one (existing in DB), delete the new one
+                    # This prevents race conditions with concurrent scanners/uploads
                     try:
-                        existing_path = Path(existing_hash.path)
-                        if existing_path.exists() and existing_path != file_path:
-                            existing_path.unlink()
-                            if not existing_path.exists():
-                                print(f"✓ Deleted uncategorized duplicate: {existing_hash.filename}")
+                        if file_path.exists():
+                            file_path.unlink()
+                            if not file_path.exists():
+                                print(f"✓ Deleted duplicate file (keeping first found): {file_path.name}")
                             else:
-                                print(f"✗ Failed to delete uncategorized duplicate: {existing_hash.filename}")
-
-                        # Delete thumbnail if exists
-                        if existing_hash.thumbnail_path:
-                            thumb_path = Path(existing_hash.thumbnail_path)
-                            if thumb_path.exists():
-                                thumb_path.unlink()
-
-                        # Remove from database
-                        self.db.delete(existing_hash)
-                        self.db.commit()
-                        print(f"✓ Removed DB entry for {existing_hash.filename}, processing new file {file_path.name}")
+                                print(f"✗ Failed to delete duplicate file: {file_path.name}")
+                        else:
+                            print(f"⚠ Duplicate file already deleted: {file_path.name}")
                     except Exception as e:
-                        print(f"✗ Error removing uncategorized duplicate {existing_hash.filename}: {e}")
-                        self.db.rollback()
-                        # If we can't delete the existing, delete the new one instead
-                        try:
-                            if file_path.exists():
-                                file_path.unlink()
-                                if not file_path.exists():
-                                    print(f"✓ Deleted new duplicate file instead: {file_path.name}")
-                                else:
-                                    print(f"✗ Failed to delete new file: {file_path.name}")
-                        except Exception as e2:
-                            print(f"✗ Error deleting new file {file_path.name}: {e2}")
-                        return
-                    # Continue processing the new file below
+                        print(f"✗ Error deleting duplicate file {file_path.name}: {e}")
+                    return
 
             # Get file info
             stat = file_path.stat()

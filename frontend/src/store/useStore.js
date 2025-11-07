@@ -18,7 +18,13 @@ export const useStore = create((set, get) => ({
       if (uncategorized) params.uncategorized = true
 
       const response = await axios.get(`${API_URL}/media`, { params })
-      set({ media: response.data, currentTinderIndex: 0 })
+      const newMedia = response.data
+
+      // Keep current index if still valid, otherwise adjust
+      const { currentTinderIndex } = get()
+      const newIndex = currentTinderIndex >= newMedia.length ? Math.max(0, newMedia.length - 1) : currentTinderIndex
+
+      set({ media: newMedia, currentTinderIndex: newIndex })
     } catch (error) {
       console.error('Failed to fetch media:', error)
     }

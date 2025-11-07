@@ -207,6 +207,9 @@ function TinderMode({ onRefresh }) {
       // Only handle if not in an input field
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
 
+      // Ignore if any modifier keys are pressed
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+
       const key = parseInt(e.key)
       if (key >= 1 && key <= 9 && categories[key - 1]) {
         e.preventDefault()
