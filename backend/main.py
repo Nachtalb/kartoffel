@@ -41,6 +41,20 @@ app.add_middleware(
 # Initialize database
 init_db()
 
+# Helper function to make paths relative
+def make_relative_path(absolute_path: str) -> str:
+    """Convert absolute path to relative path from MEDIA_DIRECTORY"""
+    if not MEDIA_DIRECTORY:
+        return absolute_path
+
+    try:
+        abs_path = Path(absolute_path).resolve()
+        media_dir = Path(MEDIA_DIRECTORY).resolve()
+        return str(abs_path.relative_to(media_dir))
+    except ValueError:
+        # Path is not relative to MEDIA_DIRECTORY
+        return absolute_path
+
 # Pydantic models for API
 class ScanRequest(BaseModel):
     directory: str
@@ -185,11 +199,11 @@ async def get_media(
     result = db.execute(query)
     media_items = result.scalars().all()
 
-    # Get categories for each media item
+    # Get categories for each media item and make paths relative
     return [
         {
             "id": m.id,
-            "path": m.path,
+            "path": make_relative_path(m.path),
             "filename": m.filename,
             "type": m.type,
             "size": m.size,
@@ -382,10 +396,25 @@ async def bulk_categorize(request: BulkCategorize):
 
 @app.get("/media/{path:path}")
 async def serve_media(path: str):
-    """Serve media files"""
-    if not os.path.exists(path):
+    """Serve media files - path is relative to MEDIA_DIRECTORY"""
+    if not MEDIA_DIRECTORY:
+        # If no media directory configured, try absolute path
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(path)
+
+    # Convert relative path back to absolute
+    media_dir = Path(MEDIA_DIRECTORY).resolve()
+    absolute_path = (media_dir / path).resolve()
+
+    # Security check: ensure the resolved path is still within MEDIA_DIRECTORY
+    if not str(absolute_path).startswith(str(media_dir)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not absolute_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path)
+
+    return FileResponse(str(absolute_path))
 
 @app.get("/thumbnails/{filename}")
 async def serve_thumbnail(filename: str):

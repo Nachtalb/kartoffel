@@ -1,4 +1,4 @@
-function MediaItem({ item, onClick, isSelected, showCheckbox }) {
+function MediaItem({ item, onClick, isSelected, showCheckbox, showCategories = false }) {
   const getThumbnailUrl = () => {
     if (item.thumbnail_path) {
       return `/thumbnails/${item.thumbnail_path.split('/').pop()}`
@@ -67,7 +67,7 @@ function MediaItem({ item, onClick, isSelected, showCheckbox }) {
       )}
 
       {/* Category badges */}
-      {item.categories && item.categories.length > 0 && !showCheckbox && (
+      {item.categories && item.categories.length > 0 && (!showCheckbox || showCategories) && (
         <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
           <div className="flex flex-wrap gap-1">
             {item.categories.slice(0, 3).map((category) => (

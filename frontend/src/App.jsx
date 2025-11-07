@@ -6,10 +6,25 @@ import TinderMode from './components/TinderMode'
 import CategoryManager from './components/CategoryManager'
 
 function App() {
-  const [mode, setMode] = useState('gallery') // gallery, bulk, tinder
+  // Initialize mode from URL hash
+  const getInitialMode = () => {
+    const hash = window.location.hash.slice(1) // Remove the #
+    if (hash === 'gallery' || hash === 'bulk' || hash === 'tinder') {
+      return hash
+    }
+    return 'gallery'
+  }
+
+  const [mode, setMode] = useState(getInitialMode)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const { fetchMedia, fetchCategories, media, refreshScan } = useStore()
+
+  // Update URL hash when mode changes
+  const changeMode = (newMode) => {
+    setMode(newMode)
+    window.location.hash = newMode
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -29,6 +44,17 @@ function App() {
   useEffect(() => {
     fetchCategories()
     fetchMedia()
+
+    // Listen for hash changes (browser back/forward)
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1)
+      if (hash === 'gallery' || hash === 'bulk' || hash === 'tinder') {
+        setMode(hash)
+      }
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
   }, [fetchCategories, fetchMedia])
 
   return (
@@ -57,7 +83,7 @@ function App() {
         {/* Mode Selector */}
         <div className="flex gap-2 mt-3">
           <button
-            onClick={() => setMode('gallery')}
+            onClick={() => changeMode('gallery')}
             className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
               mode === 'gallery'
                 ? 'bg-blue-600'
@@ -67,7 +93,7 @@ function App() {
             Gallery
           </button>
           <button
-            onClick={() => setMode('bulk')}
+            onClick={() => changeMode('bulk')}
             className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
               mode === 'bulk'
                 ? 'bg-blue-600'
@@ -77,7 +103,7 @@ function App() {
             Bulk Edit
           </button>
           <button
-            onClick={() => setMode('tinder')}
+            onClick={() => changeMode('tinder')}
             className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
               mode === 'tinder'
                 ? 'bg-blue-600'
