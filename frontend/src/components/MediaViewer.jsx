@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import CategorySelector from './CategorySelector'
 
-function MediaViewer({ item, onClose }) {
+function MediaViewer({ item, onClose, onNext, onPrevious }) {
   const { categorizeMedia, fetchMedia, deleteMedia } = useStore()
   const [showCategorySelector, setShowCategorySelector] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -28,13 +28,17 @@ function MediaViewer({ item, onClose }) {
     }
   }
 
-  // Prevent body scroll when viewer is open and handle ESC key
+  // Prevent body scroll when viewer is open and handle keyboard shortcuts
   useEffect(() => {
     document.body.style.overflow = 'hidden'
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose()
+      } else if (e.key === 'ArrowRight' && onNext) {
+        onNext()
+      } else if (e.key === 'ArrowLeft' && onPrevious) {
+        onPrevious()
       }
     }
 
@@ -44,7 +48,7 @@ function MediaViewer({ item, onClose }) {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onClose])
+  }, [onClose, onNext, onPrevious])
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
@@ -68,7 +72,7 @@ function MediaViewer({ item, onClose }) {
       </div>
 
       {/* Media */}
-      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden relative">
         {item.type === 'video' ? (
           <video
             src={`/media/${item.path}`}
@@ -83,6 +87,33 @@ function MediaViewer({ item, onClose }) {
             className="max-w-full max-h-full object-contain"
             draggable={false}
           />
+        )}
+
+        {/* Navigation Buttons */}
+        {onPrevious && (
+          <button
+            onClick={onPrevious}
+            type="button"
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-gray-900/80 hover:bg-gray-800/90 text-white rounded-full transition-all backdrop-blur"
+            aria-label="Previous image"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
+        {onNext && (
+          <button
+            onClick={onNext}
+            type="button"
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gray-900/80 hover:bg-gray-800/90 text-white rounded-full transition-all backdrop-blur"
+            aria-label="Next image"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         )}
       </div>
 
