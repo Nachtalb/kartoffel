@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -173,6 +173,58 @@ async def scan_status():
     return {
         "status": "scanning" if _is_scanning else "idle",
         "directory": MEDIA_DIRECTORY
+    }
+
+@app.post("/api/upload")
+async def upload_files(files: List[UploadFile] = File(...)):
+    """Upload multiple media files"""
+    if not MEDIA_DIRECTORY:
+        raise HTTPException(status_code=400, detail="MEDIA_DIRECTORY not configured")
+
+    if not os.path.exists(MEDIA_DIRECTORY):
+        raise HTTPException(status_code=400, detail="Media directory does not exist")
+
+    uploaded_files = []
+    errors = []
+
+    for file in files:
+        try:
+            # Check file extension
+            file_ext = Path(file.filename).suffix.lower()
+            from .scanner import ALL_EXTENSIONS
+            if file_ext not in ALL_EXTENSIONS:
+                errors.append(f"{file.filename}: Unsupported file type")
+                continue
+
+            # Save file to media directory
+            file_path = Path(MEDIA_DIRECTORY) / file.filename
+
+            # If file exists, add number suffix
+            counter = 1
+            original_stem = file_path.stem
+            while file_path.exists():
+                file_path = Path(MEDIA_DIRECTORY) / f"{original_stem}_{counter}{file_ext}"
+                counter += 1
+
+            # Write file
+            content = await file.read()
+            with open(file_path, "wb") as f:
+                f.write(content)
+
+            # Process file with scanner
+            scanner = MediaScanner(MEDIA_DIRECTORY)
+            scanner.process_file(file_path)
+            scanner.db.close()
+
+            uploaded_files.append(str(file_path.name))
+
+        except Exception as e:
+            errors.append(f"{file.filename}: {str(e)}")
+
+    return {
+        "uploaded": len(uploaded_files),
+        "files": uploaded_files,
+        "errors": errors
     }
 
 @app.get("/api/media")

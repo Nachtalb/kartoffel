@@ -5,6 +5,7 @@ import BulkEditMode from './components/BulkEditMode'
 import TinderMode from './components/TinderMode'
 import CategoryManager from './components/CategoryManager'
 import FilterBar from './components/FilterBar'
+import UploadModal from './components/UploadModal'
 
 function App() {
   // Initialize mode from URL hash
@@ -18,6 +19,7 @@ function App() {
 
   const [mode, setMode] = useState(getInitialMode)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showCategorized, setShowCategorized] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState(null)
@@ -103,6 +105,12 @@ function App() {
           <h1 className="text-xl font-bold">Media Categorizer</h1>
           <div className="flex gap-2">
             <button
+              onClick={() => setShowUploadModal(true)}
+              className="px-3 py-2 bg-blue-600 rounded-lg text-sm font-medium active:bg-blue-700"
+            >
+              Upload
+            </button>
+            <button
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="px-3 py-2 bg-green-600 rounded-lg text-sm font-medium active:bg-green-700 disabled:opacity-50"
@@ -176,6 +184,15 @@ function App() {
       {/* Modals */}
       {showCategoryManager && (
         <CategoryManager onClose={() => setShowCategoryManager(false)} />
+      )}
+
+      {showUploadModal && (
+        <UploadModal
+          onClose={() => setShowUploadModal(false)}
+          onUploadComplete={() => {
+            applyFilters()
+          }}
+        />
       )}
     </div>
   )

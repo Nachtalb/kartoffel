@@ -33,6 +33,10 @@ class MediaScanner:
         self.db.close()
         print("Scan complete")
 
+    def process_file(self, file_path: Path):
+        """Public method to process a single file"""
+        return self._process_media_file(file_path)
+
     def _find_media_files(self) -> List[Path]:
         """Find all media files in directory recursively"""
         media_files = []
