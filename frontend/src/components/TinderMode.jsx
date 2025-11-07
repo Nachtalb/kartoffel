@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import CategoryLegend from './CategoryLegend'
 
-function TinderMode() {
-  const { media, currentTinderIndex, nextTinderCard, resetTinder, categories, categorizeMedia, fetchMedia } = useStore()
+function TinderMode({ onRefresh }) {
+  const { media, currentTinderIndex, nextTinderCard, resetTinder, categories, categorizeMedia } = useStore()
   const [dragStart, setDragStart] = useState(null)
   const [dragCurrent, setDragCurrent] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
@@ -95,8 +95,10 @@ function TinderMode() {
     if (distance > 80) {
       try {
         await categorizeMedia(currentMedia.id, [selectedCategory.id])
-        // Refresh uncategorized media list to remove the categorized item
-        await fetchMedia(null, true)
+        // Refresh media list to remove the categorized item
+        if (onRefresh) {
+          await onRefresh()
+        }
       } catch (error) {
         console.error('Failed to categorize:', error)
       }
@@ -113,7 +115,9 @@ function TinderMode() {
 
   const handleReset = async () => {
     resetTinder()
-    await fetchMedia()
+    if (onRefresh) {
+      await onRefresh()
+    }
   }
 
   const handleCategoryClick = async (categoryId) => {
@@ -121,8 +125,10 @@ function TinderMode() {
 
     try {
       await categorizeMedia(currentMedia.id, [categoryId])
-      // Refresh uncategorized media list to remove the categorized item
-      await fetchMedia(null, true)
+      // Refresh media list to remove the categorized item
+      if (onRefresh) {
+        await onRefresh()
+      }
     } catch (error) {
       console.error('Failed to categorize:', error)
     }

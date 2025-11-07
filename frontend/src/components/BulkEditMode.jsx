@@ -4,8 +4,8 @@ import MediaItem from './MediaItem'
 import CategorySelector from './CategorySelector'
 import CategoryLegend from './CategoryLegend'
 
-function BulkEditMode() {
-  const { media, selectedMedia, toggleSelection, setSelection, clearSelection, bulkCategorize, fetchMedia, categories } = useStore()
+function BulkEditMode({ onRefresh }) {
+  const { media, selectedMedia, toggleSelection, setSelection, clearSelection, bulkCategorize, categories } = useStore()
   const [showCategorySelector, setShowCategorySelector] = useState(false)
   const [autoScrollInterval, setAutoScrollInterval] = useState(null)
   const [lastClickedIndex, setLastClickedIndex] = useState(null)
@@ -146,7 +146,9 @@ function BulkEditMode() {
       await bulkCategorize(Array.from(selectedMedia), categoryIds)
       clearSelection()
       setShowCategorySelector(false)
-      await fetchMedia()
+      if (onRefresh) {
+        await onRefresh()
+      }
     } catch (error) {
       console.error('Failed to categorize:', error)
     }

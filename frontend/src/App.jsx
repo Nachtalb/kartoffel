@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useStore } from './store/useStore'
 import GalleryMode from './components/GalleryMode'
 import BulkEditMode from './components/BulkEditMode'
 import TinderMode from './components/TinderMode'
 import CategoryManager from './components/CategoryManager'
+import FilterBar from './components/FilterBar'
 
 function App() {
   // Initialize mode from URL hash
@@ -18,15 +19,44 @@ function App() {
   const [mode, setMode] = useState(getInitialMode)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showCategorized, setShowCategorized] = useState(false)
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null)
   const { fetchMedia, fetchCategories, media, refreshScan } = useStore()
+
+  // Apply current filters
+  const applyFilters = useCallback(() => {
+    if (selectedCategoryId) {
+      // Show specific category
+      fetchMedia(selectedCategoryId, false)
+    } else if (showCategorized) {
+      // Show all items
+      fetchMedia(null, false)
+    } else {
+      // Show only uncategorized (default)
+      fetchMedia(null, true)
+    }
+  }, [selectedCategoryId, showCategorized, fetchMedia])
 
   // Update URL hash when mode changes
   const changeMode = (newMode) => {
     setMode(newMode)
     window.location.hash = newMode
+    applyFilters()
+  }
 
-    // By default, show only uncategorized items
-    fetchMedia(null, true)
+  // Handle filter changes
+  const handleToggleCategorized = (value) => {
+    setShowCategorized(value)
+    if (value) {
+      setSelectedCategoryId(null) // Clear category filter when showing all
+    }
+  }
+
+  const handleCategoryChange = (categoryId) => {
+    setSelectedCategoryId(categoryId)
+    if (categoryId) {
+      setShowCategorized(true) // Auto-enable show categorized when filtering by category
+    }
   }
 
   const handleRefresh = async () => {
@@ -35,7 +65,7 @@ function App() {
       const result = await refreshScan()
       // Wait a bit for the scan to start
       setTimeout(async () => {
-        await fetchMedia(null, true) // Show only uncategorized
+        applyFilters()
         setIsRefreshing(false)
       }, 2000)
     } catch (error) {
@@ -44,25 +74,26 @@ function App() {
     }
   }
 
+  // Apply filters when they change
+  useEffect(() => {
+    applyFilters()
+  }, [showCategorized, selectedCategoryId])
+
   useEffect(() => {
     fetchCategories()
-
-    // By default, show only uncategorized items
-    fetchMedia(null, true)
+    applyFilters()
 
     // Listen for hash changes (browser back/forward)
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
       if (hash === 'gallery' || hash === 'bulk' || hash === 'tinder') {
         setMode(hash)
-        // By default, show only uncategorized items
-        fetchMedia(null, true)
       }
     }
 
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [fetchCategories, fetchMedia])
+  }, [fetchCategories, applyFilters])
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
@@ -127,11 +158,19 @@ function App() {
         </div>
       </header>
 
+      {/* Filter Bar */}
+      <FilterBar
+        showCategorized={showCategorized}
+        onToggleCategorized={handleToggleCategorized}
+        selectedCategoryId={selectedCategoryId}
+        onCategoryChange={handleCategoryChange}
+      />
+
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
-        {mode === 'gallery' && <GalleryMode />}
-        {mode === 'bulk' && <BulkEditMode />}
-        {mode === 'tinder' && <TinderMode />}
+        {mode === 'gallery' && <GalleryMode onRefresh={applyFilters} />}
+        {mode === 'bulk' && <BulkEditMode onRefresh={applyFilters} />}
+        {mode === 'tinder' && <TinderMode onRefresh={applyFilters} />}
       </main>
 
       {/* Modals */}
