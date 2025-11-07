@@ -9,6 +9,8 @@ function UploadModal({ onClose, onUploadComplete }) {
   const [fileStatuses, setFileStatuses] = useState({}) // 'pending', 'uploading', 'done', 'duplicate', 'error'
   const [uploadStatus, setUploadStatus] = useState(null)
   const fileInputRef = useRef(null)
+  const fileListRef = useRef(null)
+  const [userHasScrolled, setUserHasScrolled] = useState(false)
 
   // ESC key to close and prevent body scroll
   useEffect(() => {
@@ -34,7 +36,15 @@ function UploadModal({ onClose, onUploadComplete }) {
     setUploadStatus(null)
     setFileStatuses({})
     setFileProgress({})
+    setUserHasScrolled(false)
   }
+
+  // Auto-scroll to bottom when files complete, unless user has scrolled
+  useEffect(() => {
+    if (fileListRef.current && !userHasScrolled && uploading) {
+      fileListRef.current.scrollTop = fileListRef.current.scrollHeight
+    }
+  }, [fileStatuses, userHasScrolled, uploading])
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return
@@ -139,6 +149,14 @@ function UploadModal({ onClose, onUploadComplete }) {
         onUploadComplete()
       }
 
+      // Clear selected files after upload completes
+      if (uploaded > 0 || duplicates > 0) {
+        setSelectedFiles([])
+        setFileStatuses({})
+        setFileProgress({})
+        setUserHasScrolled(false)
+      }
+
       // Auto close if all successful
       if (uploaded > 0 && duplicates === 0 && errors === 0) {
         setTimeout(() => {
@@ -230,7 +248,11 @@ function UploadModal({ onClose, onUploadComplete }) {
               <h3 className="text-sm font-medium text-gray-400">
                 Selected Files ({selectedFiles.length})
               </h3>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
+              <div
+                ref={fileListRef}
+                className="space-y-1 max-h-48 overflow-y-auto"
+                onScroll={() => setUserHasScrolled(true)}
+              >
                 {selectedFiles.map((file, index) => {
                   const status = fileStatuses[index]
                   const getStatusBadge = () => {
