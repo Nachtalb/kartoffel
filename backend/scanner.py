@@ -60,6 +60,10 @@ class MediaScanner:
     def _process_media_file(self, file_path: Path):
         """Process a single media file"""
         try:
+            # Check if file still exists (might have been deleted as duplicate)
+            if not file_path.exists():
+                return
+
             # Calculate file hash first
             file_hash = self._calculate_file_hash(file_path)
 
@@ -79,7 +83,11 @@ class MediaScanner:
                     try:
                         if file_path.exists():
                             file_path.unlink()
-                            print(f"✓ Deleted duplicate file (keeping categorized original): {file_path.name}")
+                            # Verify deletion
+                            if not file_path.exists():
+                                print(f"✓ Deleted duplicate file (keeping categorized original): {file_path.name}")
+                            else:
+                                print(f"✗ Failed to delete duplicate file: {file_path.name}")
                         else:
                             print(f"⚠ Duplicate file already deleted: {file_path.name}")
                     except Exception as e:
@@ -92,7 +100,10 @@ class MediaScanner:
                         existing_path = Path(existing_hash.path)
                         if existing_path.exists() and existing_path != file_path:
                             existing_path.unlink()
-                            print(f"Deleted uncategorized duplicate: {existing_hash.filename}")
+                            if not existing_path.exists():
+                                print(f"✓ Deleted uncategorized duplicate: {existing_hash.filename}")
+                            else:
+                                print(f"✗ Failed to delete uncategorized duplicate: {existing_hash.filename}")
 
                         # Delete thumbnail if exists
                         if existing_hash.thumbnail_path:
@@ -103,17 +114,20 @@ class MediaScanner:
                         # Remove from database
                         self.db.delete(existing_hash)
                         self.db.commit()
-                        print(f"Removed DB entry for {existing_hash.filename}, processing new file {file_path.name}")
+                        print(f"✓ Removed DB entry for {existing_hash.filename}, processing new file {file_path.name}")
                     except Exception as e:
-                        print(f"Error removing uncategorized duplicate {existing_hash.filename}: {e}")
+                        print(f"✗ Error removing uncategorized duplicate {existing_hash.filename}: {e}")
                         self.db.rollback()
                         # If we can't delete the existing, delete the new one instead
                         try:
                             if file_path.exists():
                                 file_path.unlink()
-                                print(f"Deleted new duplicate file: {file_path.name}")
+                                if not file_path.exists():
+                                    print(f"✓ Deleted new duplicate file instead: {file_path.name}")
+                                else:
+                                    print(f"✗ Failed to delete new file: {file_path.name}")
                         except Exception as e2:
-                            print(f"Error deleting new file {file_path.name}: {e2}")
+                            print(f"✗ Error deleting new file {file_path.name}: {e2}")
                         return
                     # Continue processing the new file below
 
