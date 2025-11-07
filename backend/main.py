@@ -211,8 +211,37 @@ async def upload_files(files: List[UploadFile] = File(...), db: Session = Depend
             ).scalar_one_or_none()
 
             if existing:
-                duplicates.append(f"{file.filename}: Duplicate of {existing.filename}")
-                continue
+                # Check if existing file has categories
+                has_categories = len(existing.categories) > 0
+
+                if has_categories:
+                    # Keep the existing file (has categories), skip the upload
+                    duplicates.append(f"{file.filename}: Duplicate of categorized file {existing.filename}")
+                    continue
+                else:
+                    # Existing has no categories, delete it and process the new upload
+                    try:
+                        existing_path = Path(existing.path)
+                        if existing_path.exists():
+                            existing_path.unlink()
+                            print(f"Deleted uncategorized duplicate: {existing.filename}")
+
+                        # Delete thumbnail if exists
+                        if existing.thumbnail_path:
+                            thumb_path = Path(existing.thumbnail_path)
+                            if thumb_path.exists():
+                                thumb_path.unlink()
+
+                        # Remove from database
+                        db.delete(existing)
+                        db.commit()
+                        print(f"Removed uncategorized file {existing.filename} to allow new upload")
+                    except Exception as e:
+                        print(f"Error removing uncategorized duplicate: {e}")
+                        db.rollback()
+                        duplicates.append(f"{file.filename}: Duplicate of {existing.filename} (could not replace)")
+                        continue
+                    # Continue to save the new file below
 
             # Save file to media directory
             file_path = Path(MEDIA_DIRECTORY) / file.filename
