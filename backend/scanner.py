@@ -64,10 +64,19 @@ class MediaScanner:
             if not file_path.exists():
                 return
 
-            # Calculate file hash first
+            # Check if already in database by path FIRST (to avoid comparing with itself)
+            existing = self.db.execute(
+                select(Media).where(Media.path == str(file_path))
+            ).scalar_one_or_none()
+
+            if existing:
+                # File is already indexed, skip it
+                return
+
+            # Calculate file hash
             file_hash = self._calculate_file_hash(file_path)
 
-            # Check if file with same hash already exists (duplicate)
+            # Check if file with same hash already exists (duplicate with different path)
             existing_hash = self.db.execute(
                 select(Media).where(Media.file_hash == file_hash)
             ).scalar_one_or_none()
@@ -130,15 +139,6 @@ class MediaScanner:
                             print(f"✗ Error deleting new file {file_path.name}: {e2}")
                         return
                     # Continue processing the new file below
-
-            # Check if already in database by path
-            existing = self.db.execute(
-                select(Media).where(Media.path == str(file_path))
-            ).scalar_one_or_none()
-
-            if existing:
-                print(f"Already indexed: {file_path.name}")
-                return
 
             # Get file info
             stat = file_path.stat()
