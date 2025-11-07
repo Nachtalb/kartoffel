@@ -3,8 +3,9 @@ import { useStore } from '../store/useStore'
 import CategorySelector from './CategorySelector'
 
 function MediaViewer({ item, onClose }) {
-  const { categorizeMedia, fetchMedia } = useStore()
+  const { categorizeMedia, fetchMedia, deleteMedia } = useStore()
   const [showCategorySelector, setShowCategorySelector] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleCategorize = async (categoryIds) => {
     try {
@@ -13,6 +14,17 @@ function MediaViewer({ item, onClose }) {
       await fetchMedia()
     } catch (error) {
       console.error('Failed to categorize:', error)
+    }
+  }
+
+  const handleDelete = async () => {
+    try {
+      await deleteMedia(item.id)
+      setShowDeleteConfirm(false)
+      onClose()
+    } catch (error) {
+      console.error('Failed to delete media:', error)
+      alert('Failed to delete file')
     }
   }
 
@@ -76,12 +88,22 @@ function MediaViewer({ item, onClose }) {
 
       {/* Actions */}
       <div className="bg-gray-900/80 backdrop-blur p-4">
-        <button
-          onClick={() => setShowCategorySelector(true)}
-          className="w-full py-3 bg-blue-600 rounded-lg font-medium active:bg-blue-700"
-        >
-          Categorize
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCategorySelector(true)}
+            className="flex-1 py-3 bg-blue-600 rounded-lg font-medium active:bg-blue-700"
+          >
+            Categorize
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-3 bg-red-600 rounded-lg font-medium active:bg-red-700"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {showCategorySelector && (
@@ -89,6 +111,32 @@ function MediaViewer({ item, onClose }) {
           onSelect={handleCategorize}
           onClose={() => setShowCategorySelector(false)}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-xl font-bold text-white mb-4">Delete File?</h3>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to permanently delete this file? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 bg-gray-700 rounded-lg font-medium active:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 py-2 bg-red-600 rounded-lg font-medium active:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -5,8 +5,9 @@ import CategorySelector from './CategorySelector'
 import CategoryLegend from './CategoryLegend'
 
 function BulkEditMode({ onRefresh }) {
-  const { media, selectedMedia, toggleSelection, setSelection, clearSelection, bulkCategorize, categories } = useStore()
+  const { media, selectedMedia, toggleSelection, setSelection, clearSelection, bulkCategorize, categories, deleteMedia } = useStore()
   const [showCategorySelector, setShowCategorySelector] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [autoScrollInterval, setAutoScrollInterval] = useState(null)
   const [lastClickedIndex, setLastClickedIndex] = useState(null)
   const [lastShiftRange, setLastShiftRange] = useState(null)
@@ -154,6 +155,28 @@ function BulkEditMode({ onRefresh }) {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedMedia.size === 0) return
+
+    try {
+      const selectedIds = Array.from(selectedMedia)
+
+      // Delete each file
+      for (const mediaId of selectedIds) {
+        await deleteMedia(mediaId)
+      }
+
+      clearSelection()
+      setShowDeleteConfirm(false)
+      if (onRefresh) {
+        await onRefresh()
+      }
+    } catch (error) {
+      console.error('Failed to delete media:', error)
+      alert('Failed to delete some files')
+    }
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -201,6 +224,8 @@ function BulkEditMode({ onRefresh }) {
               onClick={(e) => handleItemClick(e, item, index)}
               onTouchStart={(e) => handleTouchStart(e, item, index)}
               onTouchEnd={(e) => handleTouchEnd(e, item, index)}
+              onContextMenu={(e) => e.preventDefault()}
+              style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
             >
               <MediaItem
                 item={item}
@@ -236,6 +261,12 @@ function BulkEditMode({ onRefresh }) {
               Categorize
             </button>
             <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-600 rounded-lg font-medium active:bg-red-700"
+            >
+              Delete
+            </button>
+            <button
               onClick={clearSelection}
               className="px-4 py-2 bg-gray-700 rounded-lg font-medium active:bg-gray-600"
             >
@@ -268,6 +299,32 @@ function BulkEditMode({ onRefresh }) {
           onSelect={handleCategorize}
           onClose={() => setShowCategorySelector(false)}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-xl font-bold text-white mb-4">Delete {selectedMedia.size} file(s)?</h3>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to permanently delete {selectedMedia.size} file(s)? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 bg-gray-700 rounded-lg font-medium active:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 py-2 bg-red-600 rounded-lg font-medium active:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {selectedMedia.size === 0 && <CategoryLegend />}

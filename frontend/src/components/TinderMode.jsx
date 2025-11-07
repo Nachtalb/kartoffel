@@ -21,16 +21,41 @@ function TinderMode({ onRefresh }) {
     }
   }, [currentMedia])
 
-  // Preload next images for faster loading
+  // Preload next media for faster loading
   useEffect(() => {
     const preloadCount = 3
+    const preloadedElements = []
+
     for (let i = 1; i <= preloadCount; i++) {
       const nextIndex = currentTinderIndex + i
       if (nextIndex < media.length) {
         const nextMedia = media[nextIndex]
-        const img = new Image()
-        img.src = `/media/${nextMedia.path}`
+
+        if (nextMedia.type === 'video') {
+          // Preload video
+          const video = document.createElement('video')
+          video.preload = 'metadata'
+          video.src = `/media/${nextMedia.path}`
+          preloadedElements.push(video)
+        } else {
+          // Preload image (use thumbnail if available)
+          const img = new Image()
+          img.src = nextMedia.thumbnail_path
+            ? `/thumbnails/${nextMedia.thumbnail_path.split('/').pop()}`
+            : `/media/${nextMedia.path}`
+          preloadedElements.push(img)
+        }
       }
+    }
+
+    // Cleanup function
+    return () => {
+      preloadedElements.forEach(el => {
+        if (el instanceof HTMLVideoElement) {
+          el.src = ''
+          el.load()
+        }
+      })
     }
   }, [currentTinderIndex, media])
 

@@ -93,6 +93,18 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  deleteMedia: async (mediaId) => {
+    try {
+      await axios.delete(`${API_URL}/media/${mediaId}`)
+      // Remove from local state
+      const media = get().media.filter(m => m.id !== mediaId)
+      set({ media })
+    } catch (error) {
+      console.error('Failed to delete media:', error)
+      throw error
+    }
+  },
+
   refreshScan: async () => {
     try {
       const response = await axios.post(`${API_URL}/scan/refresh`)

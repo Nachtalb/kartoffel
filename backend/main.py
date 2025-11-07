@@ -438,6 +438,38 @@ async def bulk_categorize(request: BulkCategorize, db: Session = Depends(get_db)
 
     return {"status": "categorized", "count": len(request.media_ids)}
 
+@app.delete("/api/media/{media_id}")
+async def delete_media(media_id: int, db: Session = Depends(get_db)):
+    """Delete a media file"""
+    # Get media from database
+    media = db.execute(
+        select(Media).where(Media.id == media_id)
+    ).scalar_one_or_none()
+
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    # Delete physical file
+    try:
+        file_path = Path(media.path)
+        if file_path.exists():
+            file_path.unlink()
+
+        # Delete thumbnail if exists
+        if media.thumbnail_path:
+            thumb_path = Path(media.thumbnail_path)
+            if thumb_path.exists():
+                thumb_path.unlink()
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+        # Continue with database deletion even if file deletion fails
+
+    # Delete from database (cascade will handle MediaCategory)
+    db.delete(media)
+    db.commit()
+
+    return {"status": "deleted"}
+
 @app.get("/media/{path:path}")
 async def serve_media(path: str):
     """Serve media files - path is relative to MEDIA_DIRECTORY"""

@@ -5,6 +5,7 @@ function UploadModal({ onClose, onUploadComplete }) {
   const [selectedFiles, setSelectedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [fileProgress, setFileProgress] = useState({})
   const [uploadStatus, setUploadStatus] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -37,9 +38,13 @@ function UploadModal({ onClose, onUploadComplete }) {
 
     setUploading(true)
     setProgress(0)
+    setFileProgress({})
     setUploadStatus(null)
 
     const formData = new FormData()
+    const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0)
+    const fileSizes = selectedFiles.map(f => f.size)
+
     selectedFiles.forEach((file) => {
       formData.append('files', file)
     })
@@ -55,6 +60,23 @@ function UploadModal({ onClose, onUploadComplete }) {
             (progressEvent.loaded * 100) / progressEvent.total
           )
           setProgress(percentCompleted)
+
+          // Calculate per-file progress based on file sizes
+          const newFileProgress = {}
+          let bytesProcessed = progressEvent.loaded
+          for (let i = 0; i < selectedFiles.length; i++) {
+            const fileSize = fileSizes[i]
+            if (bytesProcessed >= fileSize) {
+              newFileProgress[i] = 100
+              bytesProcessed -= fileSize
+            } else if (bytesProcessed > 0) {
+              newFileProgress[i] = Math.round((bytesProcessed / fileSize) * 100)
+              bytesProcessed = 0
+            } else {
+              newFileProgress[i] = 0
+            }
+          }
+          setFileProgress(newFileProgress)
         },
       })
 
@@ -160,10 +182,21 @@ function UploadModal({ onClose, onUploadComplete }) {
                 {selectedFiles.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-2 bg-gray-700 rounded text-sm"
+                    className="relative bg-gray-700 rounded text-sm overflow-hidden"
                   >
-                    <span className="truncate flex-1 text-white">{file.name}</span>
-                    <span className="text-gray-400 ml-2">{formatFileSize(file.size)}</span>
+                    <div className="flex items-center justify-between p-2">
+                      <span className="truncate flex-1 text-white">{file.name}</span>
+                      <span className="text-gray-400 ml-2">{formatFileSize(file.size)}</span>
+                    </div>
+                    {/* Per-file progress bar */}
+                    {uploading && fileProgress[index] !== undefined && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                        <div
+                          className="h-full bg-blue-500 transition-all duration-300"
+                          style={{ width: `${fileProgress[index]}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
