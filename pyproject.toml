@@ -10,6 +10,7 @@ dependencies = [
     "gxhash>=3.5.0",
     "pillow>=12.0.0",
     "pydantic>=2.12.4",
+    "python-dotenv>=1.2.1",
     "python-magic==0.4.27",
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.44",
