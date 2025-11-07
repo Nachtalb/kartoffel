@@ -81,7 +81,8 @@ function TinderMode() {
     if (distance > 80) {
       try {
         await categorizeMedia(currentMedia.id, [selectedCategory.id])
-        nextTinderCard()
+        // Refresh uncategorized media list to remove the categorized item
+        await fetchMedia(null, true)
       } catch (error) {
         console.error('Failed to categorize:', error)
       }
@@ -106,7 +107,8 @@ function TinderMode() {
 
     try {
       await categorizeMedia(currentMedia.id, [categoryId])
-      nextTinderCard()
+      // Refresh uncategorized media list to remove the categorized item
+      await fetchMedia(null, true)
     } catch (error) {
       console.error('Failed to categorize:', error)
     }
@@ -153,12 +155,20 @@ function TinderMode() {
       <div className="h-full flex items-center justify-center text-gray-400">
         <div className="text-center p-4">
           <p className="text-xl mb-4">No more items!</p>
-          <button
-            onClick={handleReset}
-            className="px-6 py-3 bg-blue-600 rounded-lg font-medium active:bg-blue-700"
-          >
-            Start Over
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => window.location.hash = 'gallery'}
+              className="px-6 py-3 bg-purple-600 rounded-lg font-medium active:bg-purple-700"
+            >
+              Go to Gallery
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-6 py-3 bg-blue-600 rounded-lg font-medium active:bg-blue-700"
+            >
+              Start Over
+            </button>
+          </div>
         </div>
       </div>
     )

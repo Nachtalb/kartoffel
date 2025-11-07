@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -118,7 +118,7 @@ async def scan_directory(request: ScanRequest, background_tasks: BackgroundTasks
     return {"status": "scanning", "directory": request.directory}
 
 @app.post("/api/scan/refresh")
-async def refresh_scan():
+async def refresh_scan(db: Session = Depends(get_db)):
     """Refresh the scan - rescan configured directory and clean up deleted files"""
     global _scanner_instance, _is_scanning
 
@@ -132,7 +132,6 @@ async def refresh_scan():
         return {"status": "already_scanning"}
 
     # Clean up deleted files first
-    db = next(get_db())
     media_items = db.execute(select(Media)).scalars().all()
     deleted_count = 0
 
@@ -181,10 +180,10 @@ async def get_media(
     skip: int = 0,
     limit: int = 50,
     category_id: Optional[int] = None,
-    uncategorized: bool = False
+    uncategorized: bool = False,
+    db: Session = Depends(get_db)
 ):
     """Get all media files"""
-    db = next(get_db())
 
     query = select(Media)
 
@@ -222,9 +221,8 @@ async def get_media(
     ]
 
 @app.get("/api/media/{media_id}")
-async def get_media_item(media_id: int):
+async def get_media_item(media_id: int, db: Session = Depends(get_db)):
     """Get a specific media file with its categories"""
-    db = next(get_db())
 
     media = db.execute(select(Media).where(Media.id == media_id)).scalar_one_or_none()
     if not media:
@@ -254,9 +252,8 @@ async def get_media_item(media_id: int):
     }
 
 @app.get("/api/categories")
-async def get_categories():
+async def get_categories(db: Session = Depends(get_db)):
     """Get all categories"""
-    db = next(get_db())
     categories = db.execute(select(Category)).scalars().all()
 
     return [
@@ -270,9 +267,8 @@ async def get_categories():
     ]
 
 @app.post("/api/categories")
-async def create_category(category: CategoryCreate):
+async def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     """Create a new category"""
-    db = next(get_db())
 
     new_category = Category(
         name=category.name,
@@ -290,9 +286,8 @@ async def create_category(category: CategoryCreate):
     }
 
 @app.put("/api/categories/{category_id}")
-async def update_category(category_id: int, category: CategoryUpdate):
+async def update_category(category_id: int, category: CategoryUpdate, db: Session = Depends(get_db)):
     """Update a category"""
-    db = next(get_db())
 
     db_category = db.execute(
         select(Category).where(Category.id == category_id)
@@ -316,9 +311,8 @@ async def update_category(category_id: int, category: CategoryUpdate):
     }
 
 @app.delete("/api/categories/{category_id}")
-async def delete_category(category_id: int):
+async def delete_category(category_id: int, db: Session = Depends(get_db)):
     """Delete a category"""
-    db = next(get_db())
 
     category = db.execute(
         select(Category).where(Category.id == category_id)
@@ -333,9 +327,8 @@ async def delete_category(category_id: int):
     return {"status": "deleted"}
 
 @app.post("/api/media/categorize")
-async def categorize_media(request: MediaCategorize):
+async def categorize_media(request: MediaCategorize, db: Session = Depends(get_db)):
     """Categorize a media file"""
-    db = next(get_db())
 
     # Check if media exists
     media = db.execute(
@@ -369,9 +362,8 @@ async def categorize_media(request: MediaCategorize):
     return {"status": "categorized"}
 
 @app.post("/api/media/bulk-categorize")
-async def bulk_categorize(request: BulkCategorize):
+async def bulk_categorize(request: BulkCategorize, db: Session = Depends(get_db)):
     """Categorize multiple media files"""
-    db = next(get_db())
 
     for media_id in request.media_ids:
         # Remove existing categories
