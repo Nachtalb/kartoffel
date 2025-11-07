@@ -39,96 +39,107 @@ function UploadModal({ onClose, onUploadComplete }) {
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return
 
-    setUploading(true)
-    setProgress(0)
-    setFileProgress({})
-    setFileStatuses({})
-    setUploadStatus(null)
+    try {
+      setUploading(true)
+      setProgress(0)
+      setFileProgress({})
+      setFileStatuses({})
+      setUploadStatus(null)
 
-    let uploaded = 0
-    let duplicates = 0
-    let errors = 0
-    const duplicateMessages = []
-    const errorMessages = []
+      let uploaded = 0
+      let duplicates = 0
+      let errors = 0
+      const duplicateMessages = []
+      const errorMessages = []
 
-    // Upload files in batches of 3 to show immediate feedback
-    const uploadFile = async (file, index) => {
-      setFileStatuses(prev => ({ ...prev, [index]: 'uploading' }))
+      // Upload files in batches of 3 to show immediate feedback
+      const uploadFile = async (file, index) => {
+        try {
+          setFileStatuses(prev => ({ ...prev, [index]: 'uploading' }))
 
-      const formData = new FormData()
-      formData.append('files', file)
+          const formData = new FormData()
+          formData.append('files', file)
 
-      try {
-        const response = await axios.post('/api/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 300000,
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            )
-            setFileProgress(prev => ({ ...prev, [index]: percentCompleted }))
-          },
-        })
+          const response = await axios.post('/api/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: 300000,
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              )
+              setFileProgress(prev => ({ ...prev, [index]: percentCompleted }))
+            },
+          })
 
-        // Check response
-        if (response.data.duplicates && response.data.duplicates.length > 0) {
-          setFileStatuses(prev => ({ ...prev, [index]: 'duplicate' }))
-          duplicates++
-          duplicateMessages.push(...response.data.duplicates)
-        } else if (response.data.errors && response.data.errors.length > 0) {
+          // Check response
+          if (response.data.duplicates && response.data.duplicates.length > 0) {
+            setFileStatuses(prev => ({ ...prev, [index]: 'duplicate' }))
+            duplicates++
+            duplicateMessages.push(...response.data.duplicates)
+          } else if (response.data.errors && response.data.errors.length > 0) {
+            setFileStatuses(prev => ({ ...prev, [index]: 'error' }))
+            errors++
+            errorMessages.push(...response.data.errors)
+          } else {
+            setFileStatuses(prev => ({ ...prev, [index]: 'done' }))
+            uploaded++
+          }
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error)
           setFileStatuses(prev => ({ ...prev, [index]: 'error' }))
           errors++
-          errorMessages.push(...response.data.errors)
-        } else {
-          setFileStatuses(prev => ({ ...prev, [index]: 'done' }))
-          uploaded++
+          errorMessages.push(`${file.name}: ${error.response?.data?.detail || error.message || 'Upload failed'}`)
         }
-      } catch (error) {
-        setFileStatuses(prev => ({ ...prev, [index]: 'error' }))
-        errors++
-        errorMessages.push(`${file.name}: ${error.response?.data?.detail || error.message}`)
       }
-    }
 
-    // Process files in batches of 3
-    const batchSize = 3
-    for (let i = 0; i < selectedFiles.length; i += batchSize) {
-      const batch = selectedFiles.slice(i, i + batchSize)
-      const promises = batch.map((file, batchIndex) =>
-        uploadFile(file, i + batchIndex)
-      )
-      await Promise.all(promises)
+      // Process files in batches of 3
+      const batchSize = 3
+      for (let i = 0; i < selectedFiles.length; i += batchSize) {
+        const batch = selectedFiles.slice(i, i + batchSize)
+        const promises = batch.map((file, batchIndex) =>
+          uploadFile(file, i + batchIndex)
+        )
+        await Promise.all(promises)
 
-      // Update overall progress
-      setProgress(Math.round((Math.min(i + batchSize, selectedFiles.length) / selectedFiles.length) * 100))
-    }
+        // Update overall progress
+        setProgress(Math.round((Math.min(i + batchSize, selectedFiles.length) / selectedFiles.length) * 100))
+      }
 
-    // Final status
-    let message = `Uploaded ${uploaded} file(s)`
-    if (duplicates > 0) message += `, ${duplicates} duplicate(s) skipped`
-    if (errors > 0) message += `, ${errors} error(s)`
+      // Final status
+      let message = `Uploaded ${uploaded} file(s)`
+      if (duplicates > 0) message += `, ${duplicates} duplicate(s) skipped`
+      if (errors > 0) message += `, ${errors} error(s)`
 
-    setUploadStatus({
-      success: errors === 0,
-      message,
-      errors: errorMessages,
-      duplicates: duplicateMessages,
-    })
+      setUploadStatus({
+        success: errors === 0,
+        message,
+        errors: errorMessages,
+        duplicates: duplicateMessages,
+      })
 
-    setUploading(false)
+      // Notify parent to refresh media list
+      if (onUploadComplete && uploaded > 0) {
+        onUploadComplete()
+      }
 
-    // Notify parent to refresh media list
-    if (onUploadComplete && uploaded > 0) {
-      onUploadComplete()
-    }
-
-    // Auto close if all successful
-    if (uploaded > 0 && duplicates === 0 && errors === 0) {
-      setTimeout(() => {
-        onClose()
-      }, 2000)
+      // Auto close if all successful
+      if (uploaded > 0 && duplicates === 0 && errors === 0) {
+        setTimeout(() => {
+          onClose()
+        }, 2000)
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadStatus({
+        success: false,
+        message: 'Upload failed',
+        errors: [error.message || 'Unknown error occurred'],
+        duplicates: [],
+      })
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -160,6 +171,7 @@ function UploadModal({ onClose, onUploadComplete }) {
           <button
             onClick={onClose}
             disabled={uploading}
+            type="button"
             className="p-2 text-gray-400 hover:text-white disabled:opacity-50"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,6 +196,7 @@ function UploadModal({ onClose, onUploadComplete }) {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
+              type="button"
               className="w-full py-12 border-2 border-dashed border-gray-600 rounded-lg text-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors disabled:opacity-50"
             >
               <div className="flex flex-col items-center gap-2">
@@ -297,6 +310,7 @@ function UploadModal({ onClose, onUploadComplete }) {
           <button
             onClick={onClose}
             disabled={uploading}
+            type="button"
             className="flex-1 py-2 bg-gray-700 rounded-lg font-medium active:bg-gray-600 disabled:opacity-50"
           >
             Cancel
@@ -304,6 +318,7 @@ function UploadModal({ onClose, onUploadComplete }) {
           <button
             onClick={handleUpload}
             disabled={uploading || selectedFiles.length === 0}
+            type="button"
             className="flex-1 py-2 bg-blue-600 rounded-lg font-medium active:bg-blue-700 disabled:opacity-50"
           >
             {uploading ? 'Uploading...' : `Upload ${selectedFiles.length} file(s)`}

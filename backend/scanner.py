@@ -79,9 +79,11 @@ class MediaScanner:
                     try:
                         if file_path.exists():
                             file_path.unlink()
-                            print(f"Deleted duplicate file (keeping categorized original): {file_path.name}")
+                            print(f"✓ Deleted duplicate file (keeping categorized original): {file_path.name}")
+                        else:
+                            print(f"⚠ Duplicate file already deleted: {file_path.name}")
                     except Exception as e:
-                        print(f"Error deleting duplicate file {file_path.name}: {e}")
+                        print(f"✗ Error deleting duplicate file {file_path.name}: {e}")
                     return
                 else:
                     # Existing has no categories, delete it and process the new one

@@ -68,19 +68,21 @@ function BulkEditMode({ onRefresh }) {
     setIsDragging(false)
     setIsLongPressing(false)
 
-    // Start long-press timer (500ms like Android)
+    // Start long-press timer (400ms)
     const timer = setTimeout(() => {
+      if (!touchStartPos) return // Check if touch was cancelled
+
       setIsLongPressing(true)
       setIsDragging(true)
       // Select the item on long press
       if (!selectedMedia.has(item.id)) {
         toggleSelection(item.id)
       }
-      // Optional: vibrate on long press (if supported)
+      // Vibrate on long press (if supported)
       if (navigator.vibrate) {
         navigator.vibrate(50)
       }
-    }, 500)
+    }, 400)
     setLongPressTimer(timer)
   }
 
@@ -92,12 +94,13 @@ function BulkEditMode({ onRefresh }) {
     const dy = touch.clientY - touchStartPos.y
     const distance = Math.sqrt(dx * dx + dy * dy)
 
-    // Cancel long press if moved too much before timer completes
-    if (distance > 10 && !isLongPressing) {
+    // Cancel long press if moved too much before timer completes (30px threshold)
+    if (distance > 30 && !isLongPressing) {
       if (longPressTimer) {
         clearTimeout(longPressTimer)
         setLongPressTimer(null)
       }
+      setTouchStartPos(null)
       return
     }
 
@@ -159,13 +162,19 @@ function BulkEditMode({ onRefresh }) {
     // If not long pressing and tap was quick, toggle selection
     if (!isLongPressing && !isDragging && touchStartPos) {
       const timeSinceStart = Date.now() - touchStartPos.time
-      if (timeSinceStart < 500) {
+      if (timeSinceStart < 400) {
         e.preventDefault() // Prevent click event from firing
         setLastTouchTime(Date.now()) // Track touch time to ignore ghost clicks
         toggleSelection(item.id)
         setLastClickedIndex(index)
         setLastShiftRange(null)
       }
+    }
+
+    // If was long pressing, prevent click
+    if (isLongPressing) {
+      e.preventDefault()
+      setLastTouchTime(Date.now())
     }
 
     setTouchStartPos(null)
