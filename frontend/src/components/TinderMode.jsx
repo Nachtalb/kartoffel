@@ -8,8 +8,18 @@ function TinderMode({ onRefresh }) {
   const [dragCurrent, setDragCurrent] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const cardRef = useRef(null)
+  const videoRef = useRef(null)
 
   const currentMedia = media[currentTinderIndex]
+
+  // Auto-play videos when media changes
+  useEffect(() => {
+    if (videoRef.current && currentMedia?.type === 'video') {
+      videoRef.current.play().catch(error => {
+        console.log('Auto-play prevented:', error)
+      })
+    }
+  }, [currentMedia])
 
   // Preload next images for faster loading
   useEffect(() => {
@@ -215,9 +225,14 @@ function TinderMode({ onRefresh }) {
         >
           {currentMedia.type === 'video' ? (
             <video
+              ref={videoRef}
               src={`/media/${currentMedia.path}`}
               className="w-full h-full object-contain pointer-events-none"
               controls={!dragStart}
+              autoPlay
+              loop
+              muted
+              playsInline
             />
           ) : (
             <img
