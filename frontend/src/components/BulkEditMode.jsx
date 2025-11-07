@@ -9,6 +9,7 @@ function BulkEditMode() {
   const [showCategorySelector, setShowCategorySelector] = useState(false)
   const [autoScrollInterval, setAutoScrollInterval] = useState(null)
   const [lastClickedIndex, setLastClickedIndex] = useState(null)
+  const [lastShiftRange, setLastShiftRange] = useState(null)
   const [touchStartPos, setTouchStartPos] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef(null)
@@ -18,19 +19,30 @@ function BulkEditMode() {
     e.preventDefault()
 
     if (e.shiftKey && lastClickedIndex !== null) {
-      // Shift+click: select range
+      // Shift+click: select range from last clicked index to current
       const minIndex = Math.min(lastClickedIndex, index)
       const maxIndex = Math.max(lastClickedIndex, index)
       const rangeIds = media.slice(minIndex, maxIndex + 1).map(m => m.id)
 
-      // Add to existing selection
+      // Start with current selection
       const newSelection = new Set(selectedMedia)
+
+      // Remove previous shift-range if it exists
+      if (lastShiftRange) {
+        lastShiftRange.forEach(id => newSelection.delete(id))
+      }
+
+      // Add new shift-range
       rangeIds.forEach(id => newSelection.add(id))
       setSelection(Array.from(newSelection))
+
+      // Track this shift-range for next shift-click
+      setLastShiftRange(rangeIds)
     } else {
-      // Regular click: toggle selection
+      // Regular click: toggle selection and clear shift-range
       toggleSelection(item.id)
       setLastClickedIndex(index)
+      setLastShiftRange(null)
     }
   }
 
@@ -137,6 +149,14 @@ function BulkEditMode() {
       // Only handle if not in an input field
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
 
+      // ESC to clear selection
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        clearSelection()
+        setLastShiftRange(null)
+        return
+      }
+
       const key = parseInt(e.key)
       if (key >= 1 && key <= 9 && categories[key - 1]) {
         e.preventDefault()
@@ -152,7 +172,7 @@ function BulkEditMode() {
         clearInterval(autoScrollInterval)
       }
     }
-  }, [categories, selectedMedia, autoScrollInterval])
+  }, [categories, selectedMedia, autoScrollInterval, clearSelection])
 
   return (
     <div className="h-full flex flex-col">
