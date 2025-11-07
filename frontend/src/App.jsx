@@ -24,6 +24,15 @@ function App() {
   const changeMode = (newMode) => {
     setMode(newMode)
     window.location.hash = newMode
+
+    // Reload media with appropriate filters for the mode
+    if (newMode === 'tinder') {
+      // Tinder mode: only show uncategorized items
+      fetchMedia(null, true)
+    } else {
+      // Gallery and bulk: show all items
+      fetchMedia()
+    }
   }
 
   const handleRefresh = async () => {
@@ -43,13 +52,26 @@ function App() {
 
   useEffect(() => {
     fetchCategories()
-    fetchMedia()
+
+    // Load appropriate data for initial mode
+    const initialMode = getInitialMode()
+    if (initialMode === 'tinder') {
+      fetchMedia(null, true) // Only uncategorized
+    } else {
+      fetchMedia() // All items
+    }
 
     // Listen for hash changes (browser back/forward)
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
       if (hash === 'gallery' || hash === 'bulk' || hash === 'tinder') {
         setMode(hash)
+        // Reload data for the new mode
+        if (hash === 'tinder') {
+          fetchMedia(null, true)
+        } else {
+          fetchMedia()
+        }
       }
     }
 

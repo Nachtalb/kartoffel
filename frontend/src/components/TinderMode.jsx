@@ -18,7 +18,9 @@ function TinderMode() {
     const degrees = ((angle * 180) / Math.PI + 360) % 360
     const sliceAngle = 360 / categories.length
 
-    const sliceIndex = Math.floor(degrees / sliceAngle)
+    // Adjust for -90 degree offset (pie starts at top, not right)
+    const adjustedDegrees = (degrees + 90) % 360
+    const sliceIndex = Math.floor(adjustedDegrees / sliceAngle)
     return categories[sliceIndex]
   }
 
