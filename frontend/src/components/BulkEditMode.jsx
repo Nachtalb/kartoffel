@@ -289,28 +289,28 @@ function BulkEditMode({ onRefresh }) {
         )}
       </div>
 
-      {/* Action Bar */}
+      {/* Action Bar - Fixed at bottom */}
       {selectedMedia.size > 0 && (
-        <div className="bg-gray-800 border-t border-gray-700 p-4">
-          <div className="flex gap-2 mb-2">
-            <div className="flex-1 flex items-center text-sm">
+        <div className="bg-gray-800 border-t border-gray-700 p-3 sm:p-4 flex-shrink-0">
+          <div className="flex gap-2 mb-3">
+            <div className="flex-1 flex items-center text-sm font-medium">
               {selectedMedia.size} selected
             </div>
             <button
               onClick={() => setShowCategorySelector(true)}
-              className="px-4 py-2 bg-blue-600 rounded-lg font-medium active:bg-blue-700"
+              className="px-3 sm:px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium active:bg-blue-700 whitespace-nowrap"
             >
               Categorize
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 bg-red-600 rounded-lg font-medium active:bg-red-700"
+              className="px-3 sm:px-4 py-2 bg-red-600 rounded-lg text-sm font-medium active:bg-red-700 whitespace-nowrap"
             >
               Delete
             </button>
             <button
               onClick={clearSelection}
-              className="px-4 py-2 bg-gray-700 rounded-lg font-medium active:bg-gray-600"
+              className="px-3 sm:px-4 py-2 bg-gray-700 rounded-lg text-sm font-medium active:bg-gray-600 whitespace-nowrap"
             >
               Clear
             </button>
@@ -318,12 +318,12 @@ function BulkEditMode({ onRefresh }) {
 
           {/* Quick category buttons with keyboard shortcuts */}
           {categories.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               {categories.slice(0, 9).map((category, index) => (
                 <button
                   key={category.id}
                   onClick={() => handleCategorize([category.id])}
-                  className="px-3 py-1 rounded text-white text-sm font-medium active:opacity-80"
+                  className="px-3 py-1.5 rounded text-white text-sm font-medium active:opacity-80 whitespace-nowrap flex-shrink-0"
                   style={{ backgroundColor: category.color }}
                   title={`Press ${index + 1} to categorize`}
                 >
