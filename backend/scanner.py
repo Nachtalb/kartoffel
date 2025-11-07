@@ -40,12 +40,10 @@ class MediaScanner:
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate gxhash of a file"""
-        hasher = gxhash.Gxhash128()
+        hasher = gxhash.GxHash128()
         with open(file_path, 'rb') as f:
-            # Read file in chunks to handle large files
-            while chunk := f.read(8192):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+            file_hash = hasher.hash_file(f)
+        return str(file_hash)
 
     def _find_media_files(self) -> List[Path]:
         """Find all media files in directory recursively"""

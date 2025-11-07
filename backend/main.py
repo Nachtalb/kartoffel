@@ -202,9 +202,8 @@ async def upload_files(files: List[UploadFile] = File(...), db: Session = Depend
             content = await file.read()
 
             # Calculate hash to check for duplicates
-            hasher = gxhash.Gxhash128()
-            hasher.update(content)
-            file_hash = hasher.hexdigest()
+            hasher = gxhash.GxHash128()
+            file_hash = str(hasher.hash(content))
 
             # Check if file with same hash already exists
             existing = db.execute(
